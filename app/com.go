@@ -42,6 +42,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateLPop(args)
 	case "blpop":
 		err = com.ValidateBLPop(args)
+	case "type":
+		err = com.ValidateType(args)
 	}
 
 	return com, err
@@ -69,6 +71,9 @@ func (com *Com) HandleCom() []byte {
 		return com.lpop()
 	case "blpop":
 		return com.blpop()
+	case "type":
+		return com.handleType()
+
 	default:
 		return nil
 	}
@@ -212,6 +217,17 @@ func (com *Com) ValidateBLPop(args []string) error {
 		com.Args["timeout"] = []string{args[1]}
 	} else {
 		return errors.New("BLPop expects timeout to be passed as an argument")
+	}
+
+	return nil
+}
+
+func (com *Com) ValidateType(args []string) error {
+	// key
+	if len(args) >= 1 {
+		com.Args["key"] = []string{args[0]}
+	} else {
+		return errors.New("Type expects key to be passed as an argument")
 	}
 
 	return nil

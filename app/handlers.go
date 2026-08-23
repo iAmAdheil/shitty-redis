@@ -200,3 +200,20 @@ func (com *Com) blpop() []byte {
 
 	return res
 }
+
+func (com *Com) handleType() []byte {
+	key := com.Args["key"][0]
+	var out []string
+
+	vmu.Lock()
+	val, ok := vars[key]
+	if !ok {
+		out = []string{"none"}
+	} else {
+		t := fmt.Sprintf("%T", val)
+		out = []string{t}
+	}
+	defer vmu.Unlock()
+
+	return RESPEncoder(out, Simple)
+}
