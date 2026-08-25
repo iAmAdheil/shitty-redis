@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -203,17 +204,56 @@ func (com *Com) blpop() []byte {
 
 func (com *Com) handleType() []byte {
 	key := com.Args["key"][0]
-	var out []string
+	var out []string = []string{"none"}
 
-	vmu.Lock()
-	val, ok := vars[key]
-	if !ok {
-		out = []string{"none"}
-	} else {
-		t := fmt.Sprintf("%T", val)
+	vmu.RLock()
+	defer vmu.RUnlock()
+	_, ok := vars[key]
+	if ok {
+		t := "string"
 		out = []string{t}
+		return RESPEncoder(out, Simple)
 	}
-	defer vmu.Unlock()
+
+	smu.RLock()
+	defer smu.RUnlock()
+	_, ok = streams[key]
+	if ok {
+		t := "stream"
+		out = []string{t}
+		return RESPEncoder(out, Simple)
+	}
 
 	return RESPEncoder(out, Simple)
+}
+
+func (com *Com) xadd() []byte {
+	streamkey := com.Args["streamkey"][0]
+	id := com.Args["id"][0]
+	data := com.Args["data"]
+
+	// inner object
+	obj := make(map[string]string)
+
+	for i := 0; i < len(data); i++ {
+		obj[data[i]] = data[i+1]
+		i++
+	}
+
+	stream, ok := streams[streamkey]
+	if !ok {
+		ns := make(map[string]map[string]string)
+		ns[id] = obj
+		streams[streamkey] = &Stream{
+			mu: &sync.RWMutex{},
+		}
+	} else {
+		stream.mu.Lock()
+		// add {id: {key: value}} to the entries in Stream
+		entries := (*stream).entries
+		(*entries)[id] = obj
+		stream.mu.Unlock()
+	}
+
+	return RESPEncoder([]string{id}, Bulk)
 }

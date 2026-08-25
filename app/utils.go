@@ -14,11 +14,21 @@ import (
 // - arg validation should happen during decoding -> string to int conversions should not happen within my com handlers
 
 var vars = make(map[string]string)
-var vmu sync.Mutex = sync.Mutex{}
+var vmu sync.RWMutex = sync.RWMutex{}
 
+// add a similar structure as Stream for lists
 var lists = make(map[string]*[]string)
 var listch = make(map[string][]chan string)
 var lmu sync.RWMutex = sync.RWMutex{}
+
+type Stream struct {
+	mu      *sync.RWMutex
+	entries *map[string]map[string]string
+}
+
+// streamkey:{lock, entries: {id: {key: value}}}
+var streams = make(map[string]*Stream)
+var smu = sync.RWMutex{}
 
 // dir -> 0 for append
 // dir -> 1 for prepend

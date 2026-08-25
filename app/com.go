@@ -4,6 +4,8 @@ import (
 	"errors"
 )
 
+// #D1 -> using []string as arg value for now. If it does not work out, go for any in the future
+
 type Com struct {
 	Base string
 	Args map[string][]string
@@ -44,6 +46,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateBLPop(args)
 	case "type":
 		err = com.ValidateType(args)
+	case "xadd":
+		err = com.ValidateXAdd(args)
 	}
 
 	return com, err
@@ -73,6 +77,8 @@ func (com *Com) HandleCom() []byte {
 		return com.blpop()
 	case "type":
 		return com.handleType()
+	case "xadd":
+		return com.xadd()
 
 	default:
 		return nil
@@ -229,6 +235,24 @@ func (com *Com) ValidateType(args []string) error {
 	} else {
 		return errors.New("Type expects key to be passed as an argument")
 	}
+
+	return nil
+}
+
+func (com *Com) ValidateXAdd(args []string) error {
+	if len(args) >= 1 {
+		com.Args["streamkey"] = []string{args[0]}
+	} else {
+		return errors.New("XAdd expects stream key to be passed as an argument")
+	}
+	if len(args) >= 2 {
+		com.Args["id"] = []string{args[1]}
+	} else {
+		return errors.New("XAdd expects id to be passed as an argument")
+	}
+
+	args = args[2:]
+	com.Args["data"] = args
 
 	return nil
 }
