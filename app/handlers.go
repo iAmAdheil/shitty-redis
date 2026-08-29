@@ -245,7 +245,8 @@ func (com *Com) xadd() []byte {
 		ns := make(map[string]map[string]string)
 		ns[id] = obj
 		streams[streamkey] = &Stream{
-			mu: &sync.RWMutex{},
+			mu:      &sync.RWMutex{},
+			entries: &ns,
 		}
 	} else {
 		stream.mu.Lock()

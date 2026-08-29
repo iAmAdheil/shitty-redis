@@ -240,16 +240,24 @@ func (com *Com) ValidateType(args []string) error {
 }
 
 func (com *Com) ValidateXAdd(args []string) error {
+	var key string
 	if len(args) >= 1 {
-		com.Args["streamkey"] = []string{args[0]}
+		key = args[0]
+		com.Args["streamkey"] = []string{key}
 	} else {
 		return errors.New("XAdd expects stream key to be passed as an argument")
 	}
+
+	var id string
 	if len(args) >= 2 {
-		com.Args["id"] = []string{args[1]}
+		id = args[1]
+		if err := validateStreamEntryId(key, id); err != nil {
+			return err
+		}
 	} else {
 		return errors.New("XAdd expects id to be passed as an argument")
 	}
+	com.Args["id"] = []string{id}
 
 	args = args[2:]
 	com.Args["data"] = args

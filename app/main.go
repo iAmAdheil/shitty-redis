@@ -34,20 +34,24 @@ func HandleConn(conn net.Conn) {
 			break
 		}
 
+		var out []byte
+
 		base, args, err := RESPDecoder(in[:n])
 		if err != nil {
 			// do something
 		}
+
 		com, err := GetCom(base, args)
 		if err != nil {
-			// do something
+			out = RESPEncoder([]string{err.Error()}, SimpleErr)
+		} else {
+			out = com.HandleCom()
 		}
+
 		// log sent over request
 		// for _, v := range parts {
 		// 	fmt.Printf("%q\n", v)
 		// }
-
-		out := com.HandleCom()
 
 		if _, err := conn.Write(out); err != nil {
 			fmt.Printf("Error writing into connection: %s\n", err.Error())

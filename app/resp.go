@@ -93,6 +93,7 @@ const (
 	Int
 	BulkList
 	NullBulkList
+	SimpleErr
 )
 
 var typeName = map[EncodeType]string{
@@ -102,6 +103,7 @@ var typeName = map[EncodeType]string{
 	BulkList:     "bulk_list",
 	NullBulk:     "null_bulk",
 	NullBulkList: "null_bulk_list",
+	SimpleErr:    "simple_err",
 }
 
 func (et EncodeType) String() string {
@@ -136,6 +138,9 @@ func RESPEncoder(res []string, t EncodeType) []byte {
 	case Bulk:
 		v := res[0]
 		s = fmt.Sprintf("$%s\r\n%s\r\n", strconv.Itoa(len(v)), v)
+	case SimpleErr:
+		msg := res[0]
+		s = fmt.Sprintf("-ERR %s\r\n", msg)
 	}
 
 	return []byte(s)
