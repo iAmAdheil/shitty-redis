@@ -53,14 +53,50 @@ func splitStreamEntryId(id string) (int64, int, error) {
 	return mil, i, nil
 }
 
-// func generateStreamEntryId() string {
-// 	return ""
-// }
+func generateStreamEntryId(key, id string) (string, error) {
+	var gid string
+	p := strings.Split(id, "-")
+
+	// full id
+	if p[0] == "*" {
+
+	} else if p[1] == "*" {
+		// partial id
+		stream, ok := streams[key]
+		if !ok || len(*(stream.entries)) == 0 {
+			if p[0] == "0" {
+				gid = p[0] + "-" + "1"
+			} else {
+				gid = p[0] + "-" + "0"
+			}
+		} else {
+			mil, err := strconv.ParseInt(p[0], 10, 64)
+			if err != nil {
+				return "", err
+			}
+
+			maxMil, maxI, err := stream.getMaxEntry()
+			if err != nil {
+				return "", err
+			}
+
+			if maxMil < mil {
+				gid = p[0] + "-" + "0"
+			} else if maxMil == mil {
+				gid = p[0] + "-" + strconv.Itoa(maxI+1)
+			} else {
+				return "", errors.New("The ID specified in XADD is smaller than the target stream top item")
+			}
+		}
+	}
+
+	return gid, nil
+}
 
 func validateStreamEntryId(key, id string) error {
 	mil, i, err := splitStreamEntryId(id)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// check for invalid stream entry id 0-0

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 )
 
 // #D1 -> using []string as arg value for now. If it does not work out, go for any in the future
@@ -251,8 +252,21 @@ func (com *Com) ValidateXAdd(args []string) error {
 	var id string
 	if len(args) >= 2 {
 		id = args[1]
-		if err := validateStreamEntryId(key, id); err != nil {
-			return err
+		// check for * in id
+		p := strings.Split(id, "-")
+		if p[0] == "*" || p[1] == "*" {
+			// if either part is *, generate id
+			gid, err := generateStreamEntryId(key, id)
+			if err != nil {
+				return err
+			}
+
+			id = gid
+		} else {
+			// if no *, use validate and use the same
+			if err := validateStreamEntryId(key, id); err != nil {
+				return err
+			}
 		}
 	} else {
 		return errors.New("XAdd expects id to be passed as an argument")
