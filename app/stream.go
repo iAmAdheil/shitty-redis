@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // streamkey:{lock, entries: {id: {key: value}}}
@@ -59,6 +60,30 @@ func generateStreamEntryId(key, id string) (string, error) {
 
 	// full id
 	if p[0] == "*" {
+		milInt := time.Now().UnixMilli()
+		mil := strconv.FormatInt(milInt, 10)
+
+		stream, ok := streams[key]
+		if !ok {
+			if mil == "0" {
+				gid = mil + "-" + "1"
+			} else {
+				gid = mil + "-" + "0"
+			}
+		} else {
+			maxMil, maxI, err := stream.getMaxEntry()
+			if err != nil {
+				return "", err
+			}
+
+			if maxMil < milInt {
+				gid = mil + "-" + "0"
+			} else if maxMil == milInt {
+				gid = mil + "-" + strconv.Itoa(maxI+1)
+			} else {
+				return "", errors.New("The ID specified in XADD is smaller than the target stream top item")
+			}
+		}
 
 	} else if p[1] == "*" {
 		// partial id
