@@ -129,16 +129,24 @@ func validateStreamEntryId(key, id string) error {
 		return errors.New("The ID specified in XADD must be greater than 0-0")
 	}
 
+	smu.RLock()
 	stream, ok := streams[key]
+	// release as soon as pointer to stream acquired
+	smu.RUnlock()
 	// any id other than 0-0 is valid
-	if !ok || len(*(stream.entries)) == 0 {
+	if !ok {
 		return nil
 	}
 
 	stream.mu.RLock()
 	defer stream.mu.RUnlock()
+
+	if len(*(stream.entries)) == 0 {
+		return nil
+	}
+
 	// get max id
-	maxMil, maxI, err := stream.getMaxEntry()
+	maxMil, maxI, err := stream.getMaxEntry(-1)
 	if err != nil {
 		return err
 	}
@@ -148,4 +156,102 @@ func validateStreamEntryId(key, id string) error {
 	}
 
 	return nil
+}
+
+func generateStreamEntryId(key, id string) (string, error) {
+	p := strings.Split(id, "-")
+
+	// full id
+	if p[0] == "*" {
+		return handleGenerateFullId(key)
+	} else if p[1] == "*" {
+		// partial id
+		return handleGeneratePartialId(key, p[0])
+	}
+
+	return "", nil
+}
+
+func handleGenerateFullId(key string) (string, error) {
+	var gid string
+
+	milInt := time.Now().UnixMilli()
+	mil := strconv.FormatInt(milInt, 10)
+
+	smu.RLock()
+	stream, ok := streams[key]
+	smu.RUnlock()
+	if !ok {
+		if mil == "0" {
+			gid = mil + "-" + "1"
+		} else {
+			gid = mil + "-" + "0"
+		}
+	} else {
+		stream.mu.RLock()
+		defer stream.mu.RUnlock()
+		maxMil, maxI, err := stream.getMaxEntry(-1)
+		if err != nil {
+			return "", err
+		}
+
+		if maxMil < milInt {
+			gid = mil + "-" + "0"
+		} else if maxMil == milInt {
+			gid = mil + "-" + strconv.Itoa(maxI+1)
+		} else {
+			return "", errors.New("The ID specified in XADD is smaller than the target stream top item")
+		}
+	}
+
+	return gid, nil
+}
+
+// mils -> string mil extracted from the first part of the entry id
+// passed from the caller
+func handleGeneratePartialId(key string, mils string) (string, error) {
+	var gid string
+
+	smu.RLock()
+	stream, ok := streams[key]
+	smu.RUnlock()
+
+	if !ok {
+		if mils == "0" {
+			gid = mils + "-" + "1"
+		} else {
+			gid = mils + "-" + "0"
+		}
+
+		return gid, nil
+	}
+
+	stream.mu.RLock()
+	defer stream.mu.RUnlock()
+	if len(*(stream.entries)) == 0 {
+		if mils == "0" {
+			gid = mils + "-" + "1"
+		} else {
+			gid = mils + "-" + "0"
+		}
+	} else {
+		mil, err := strconv.ParseInt(mils, 10, 64)
+		if err != nil {
+			return "", err
+		}
+		maxMil, maxI, err := stream.getMaxEntry(-1)
+		if err != nil {
+			return "", err
+		}
+
+		if maxMil < mil {
+			gid = mils + "-" + "0"
+		} else if maxMil == mil {
+			gid = mils + "-" + strconv.Itoa(maxI+1)
+		} else {
+			return "", errors.New("The ID specified in XADD is smaller than the target stream top item")
+		}
+	}
+
+	return gid, nil
 }
