@@ -49,6 +49,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateType(args)
 	case "xadd":
 		err = com.ValidateXAdd(args)
+	case "xrange":
+		err = com.ValidateXRange(args)
 	}
 
 	return com, err
@@ -80,6 +82,8 @@ func (com *Com) HandleCom() []byte {
 		return com.handleType()
 	case "xadd":
 		return com.xadd()
+	case "xrange":
+		return com.xrange()
 
 	default:
 		return nil
@@ -275,6 +279,26 @@ func (com *Com) ValidateXAdd(args []string) error {
 
 	args = args[2:]
 	com.Args["data"] = args
+
+	return nil
+}
+
+func (com *Com) ValidateXRange(args []string) error {
+	if len(args) >= 1 {
+		com.Args["streamkey"] = []string{args[0]}
+	} else {
+		return errors.New("XAdd expects stream key to be passed as an argument")
+	}
+	if len(args) >= 2 {
+		com.Args["low"] = []string{args[1]}
+	} else {
+		return errors.New("XAdd expects lower range to be passed as an argument")
+	}
+	if len(args) >= 3 {
+		com.Args["high"] = []string{args[2]}
+	} else {
+		return errors.New("XAdd expects upper range to be passed as an argument")
+	}
 
 	return nil
 }
