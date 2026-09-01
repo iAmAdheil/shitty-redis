@@ -8,13 +8,11 @@ import (
 )
 
 func (com *Com) ping() []byte {
-	return RESPEncoder([]string{"PONG"}, Simple)
+	return RESPEncoder("PONG", Simple)
 }
 
 func (com *Com) echo() []byte {
-	s := com.Args["echothis"][0]
-
-	return RESPEncoder([]string{s}, Bulk)
+	return RESPEncoder(com.Args["echothis"][0], Bulk)
 }
 
 func (com *Com) get() []byte {
@@ -27,7 +25,7 @@ func (com *Com) get() []byte {
 	if !ok {
 		return RESPEncoder(nil, NullBulk)
 	} else {
-		return RESPEncoder([]string{val}, Bulk)
+		return RESPEncoder(val, Bulk)
 	}
 }
 
@@ -51,7 +49,7 @@ func (com *Com) set() []byte {
 		}
 	}
 
-	return RESPEncoder([]string{"OK"}, Simple)
+	return RESPEncoder("OK", Simple)
 }
 
 func (com *Com) rpush() []byte {
@@ -60,7 +58,7 @@ func (com *Com) rpush() []byte {
 
 	listsize := AddToList(listkey, values, 0)
 
-	return RESPEncoder([]string{strconv.Itoa(listsize)}, Int)
+	return RESPEncoder(strconv.Itoa(listsize), Int)
 }
 
 func (com *Com) lrange() []byte {
@@ -87,16 +85,14 @@ func (com *Com) lpush() []byte {
 
 	listsize := AddToList(listkey, values, 1)
 
-	out := []string{strconv.Itoa(listsize)}
-	return RESPEncoder(out, Int)
+	return RESPEncoder(strconv.Itoa(listsize), Int)
 }
 
 func (com *Com) llen() []byte {
 	listkey := com.Args["listkey"][0]
 	listsize := GetListLen(listkey)
 
-	out := []string{strconv.Itoa(listsize)}
-	return RESPEncoder(out, Int)
+	return RESPEncoder(strconv.Itoa(listsize), Int)
 }
 
 func (com *Com) lpop() []byte {
@@ -204,27 +200,24 @@ func (com *Com) blpop() []byte {
 
 func (com *Com) handleType() []byte {
 	key := com.Args["key"][0]
-	var out []string = []string{"none"}
 
+	// key in list
 	vmu.RLock()
 	defer vmu.RUnlock()
 	_, ok := vars[key]
 	if ok {
-		t := "string"
-		out = []string{t}
-		return RESPEncoder(out, Simple)
+		return RESPEncoder("string", Simple)
 	}
 
+	// key in stream
 	smu.RLock()
 	defer smu.RUnlock()
 	_, ok = streams[key]
 	if ok {
-		t := "stream"
-		out = []string{t}
-		return RESPEncoder(out, Simple)
+		return RESPEncoder("stream", Simple)
 	}
 
-	return RESPEncoder(out, Simple)
+	return RESPEncoder("none", Simple)
 }
 
 func (com *Com) xadd() []byte {
@@ -256,5 +249,23 @@ func (com *Com) xadd() []byte {
 		stream.mu.Unlock()
 	}
 
-	return RESPEncoder([]string{id}, Bulk)
+	return RESPEncoder(id, Bulk)
+}
+
+func (com *Com) xrange() []byte {
+	key := com.Args["streamkey"][0]
+	low := com.Args["low"][0]
+	high := com.Args["high"][0]
+
+	smu.RLock()
+	stream, _ := streams[key]
+	smu.RUnlock()
+
+	// getEntriesInMilRange -> handles its own stream locking
+	entries, err := stream.getEntriesInRange(low, high)
+	if err != nil {
+		// do something
+	}
+
+	return RESPEncoder(entries, Array)
 }

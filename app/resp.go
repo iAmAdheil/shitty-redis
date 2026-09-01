@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -94,6 +95,7 @@ const (
 	BulkList
 	NullBulkList
 	SimpleErr
+	Array
 )
 
 var typeName = map[EncodeType]string{
@@ -104,6 +106,7 @@ var typeName = map[EncodeType]string{
 	NullBulk:     "null_bulk",
 	NullBulkList: "null_bulk_list",
 	SimpleErr:    "simple_err",
+	Array:        "array",
 }
 
 func (et EncodeType) String() string {
@@ -114,33 +117,68 @@ func (et EncodeType) String() string {
 // bulk string -> ${string_len}\r\n{string}\r\n
 // RESP integer -> :{integer (sent as a string)}\r\n
 // bulk string list -> *{res count} ... ${string_len}\r\n{string}\r\n
-func RESPEncoder(res []string, t EncodeType) []byte {
-	var s string
+func RESPEncoder(res any, t EncodeType) []byte {
+	var (
+		s   string
+		err error = nil
+	)
 
 	switch t {
 
 	case Simple:
-		s = fmt.Sprintf("+%s\r\n", res[0])
+		if val, ok := res.(string); ok {
+			s = fmt.Sprintf("+%s\r\n", val)
+		} else {
+			err = errors.New("Encoding failed")
+		}
 
 	case Int:
-		s = fmt.Sprintf(":%s\r\n", res[0])
+		if val, ok := res.(string); ok {
+			s = fmt.Sprintf(":%s\r\n", val)
+		} else {
+			err = errors.New("Encoding failed")
+		}
 
 	case NullBulkList:
 		s = "*-1\r\n"
 	case BulkList:
-		s = fmt.Sprintf("*%s\r\n", strconv.Itoa(len(res)))
-		for _, v := range res {
-			s += fmt.Sprintf("$%s\r\n%s\r\n", strconv.Itoa(len(v)), v)
+		if val, ok := res.([]string); ok {
+			s = fmt.Sprintf("*%s\r\n", strconv.Itoa(len(val)))
+			for _, v := range val {
+				s += fmt.Sprintf("$%s\r\n%s\r\n", strconv.Itoa(len(v)), v)
+			}
+		} else {
+			err = errors.New("Encoding failed")
 		}
 
 	case NullBulk:
 		s = "$-1\r\n"
 	case Bulk:
-		v := res[0]
-		s = fmt.Sprintf("$%s\r\n%s\r\n", strconv.Itoa(len(v)), v)
+		if val, ok := res.(string); ok {
+			s = fmt.Sprintf("$%s\r\n%s\r\n", strconv.Itoa(len(val)), val)
+		} else {
+			err = errors.New("Encoding failed")
+		}
 	case SimpleErr:
-		msg := res[0]
-		s = fmt.Sprintf("-ERR %s\r\n", msg)
+		if val, ok := res.(string); ok {
+			s = fmt.Sprintf("-ERR %s\r\n", val)
+		} else {
+			err = errors.New("Encoding failed")
+		}
+
+	case Array:
+		if val, ok := res.([]string); ok {
+			s = fmt.Sprintf("*%s\r\n", strconv.Itoa(len(val)))
+			for _, v := range val {
+				s += v
+			}
+		} else {
+			err = errors.New("Encoding failed")
+		}
+	}
+
+	if err != nil {
+		panic(err.Error())
 	}
 
 	return []byte(s)
