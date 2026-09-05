@@ -122,7 +122,7 @@ func (st *Stream) getEntriesInRange(unflow, unfhigh string) ([]string, error) {
 			return res, err
 		}
 
-		if (lowMil <= mil || mil <= highMil) || (lowMil == mil && i >= lowI) || (highMil == mil && i <= highI) {
+		if (lowMil < mil && mil < highMil) || (lowMil == mil && highMil != mil && i >= lowI) || (lowMil != mil && highMil == mil && i <= highI) || (lowMil == mil && highMil == mil && lowI <= i && i <= highI) {
 			var s string = "*2\r\n"
 			s += fmt.Sprintf("$%d\r\n%s\r\n", len(id), id)
 

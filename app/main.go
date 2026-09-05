@@ -43,7 +43,7 @@ func HandleConn(conn net.Conn) {
 
 		com, err := GetCom(base, args)
 		if err != nil {
-			out = RESPEncoder([]string{err.Error()}, SimpleErr)
+			out = RESPEncoder(err.Error(), SimpleErr)
 		} else {
 			out = com.HandleCom()
 		}
