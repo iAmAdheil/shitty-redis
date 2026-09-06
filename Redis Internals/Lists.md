@@ -60,18 +60,18 @@ One malloc, 24 bytes, holding 3 elements — no pointers inside it.
 
 The tag's own bits *are* the type — no separate type field. From Redis's source, `src/listpack.c`:
 
-| Tag pattern (binary) | Byte value | Type | Holds |
-|---|---|---|---|
-| `0xxxxxxx` | 0x00–0x7F | 7-bit uint | value 0–127, in the tag itself |
-| `10xxxxxx` | 0x80–0xBF | 6-bit string | length 0–63, in the tag itself |
-| `110xxxxx` | 0xC0–0xDF | 13-bit int | 5 bits here + next byte = 13-bit signed int |
-| `1110xxxx` | 0xE0–0xEF | 12-bit string | 4 bits here + next byte = 12-bit length |
-| `11110000` | 0xF0 | 32-bit string | length in next 4 bytes |
-| `11110001` | 0xF1 | 16-bit int | value in next 2 bytes |
-| `11110010` | 0xF2 | 24-bit int | value in next 3 bytes |
-| `11110011` | 0xF3 | 32-bit int | value in next 4 bytes |
-| `11110100` | 0xF4 | 64-bit int | value in next 8 bytes |
-| `11111111` | 0xFF | end marker | not a real entry — marks end of listpack |
+| Tag pattern (binary) | Byte value | Type          | Holds                                       |
+| -------------------- | ---------- | ------------- | ------------------------------------------- |
+| `0xxxxxxx`           | 0x00–0x7F  | 7-bit uint    | value 0–127, in the tag itself              |
+| `10xxxxxx`           | 0x80–0xBF  | 6-bit string  | length 0–63, in the tag itself              |
+| `110xxxxx`           | 0xC0–0xDF  | 13-bit int    | 5 bits here + next byte = 13-bit signed int |
+| `1110xxxx`           | 0xE0–0xEF  | 12-bit string | 4 bits here + next byte = 12-bit length     |
+| `11110000`           | 0xF0       | 32-bit string | length in next 4 bytes                      |
+| `11110001`           | 0xF1       | 16-bit int    | value in next 2 bytes                       |
+| `11110010`           | 0xF2       | 24-bit int    | value in next 3 bytes                       |
+| `11110011`           | 0xF3       | 32-bit int    | value in next 4 bytes                       |
+| `11110100`           | 0xF4       | 64-bit int    | value in next 8 bytes                       |
+| `11111111`           | 0xFF       | end marker    | not a real entry — marks end of listpack    |
 
 Reading order: check bit 7 first (`0` = small int), else bit 6 (`10` = small string), else bit 5 (`110` = medium int), and so on. Each prefix is unambiguous, so one byte tells Redis exactly how many more bytes to read.
 
