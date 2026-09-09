@@ -8,7 +8,7 @@ import (
 type Listpack struct {
 	// header size -> 6 bytes
 	size    [4]byte // byte count
-	Count   [2]byte // entry count
+	count   [2]byte // entry count
 	Entries []byte
 }
 
@@ -27,7 +27,7 @@ func (lp *Listpack) GetSize() uint32 {
 }
 
 func (lp *Listpack) GetCount() uint16 {
-	return binary.LittleEndian.Uint16(lp.size[:])
+	return binary.LittleEndian.Uint16(lp.count[:])
 }
 
 // returns an error if the listpack does not have sufficient space for the entry to fit in
