@@ -96,6 +96,56 @@ Reading order: check bit 7 first (`0` = small int), else bit 6 (`10` = small str
 
 Same struct, same byte format. Each caller just decides what values go in.
 
+## Parsing an Entry Back: Bytes to Value
+
+Encoding turns a value into bytes (`getEntry`, `handleIntEntry`, `handleStrEntry`). Decoding is the reverse: given a cursor sitting at the first byte of an entry, recover the original value and know exactly where the next entry starts.
+
+### Step 1 — read the first byte, match it against the tag table
+
+Check the tag byte's leading bits, in the same top-to-bottom order as "All possible tags" above. The first matching pattern wins — the prefixes never overlap, so exactly one row applies:
+
+| Tag pattern | What the decoder does next |
+|---|---|
+| `0xxxxxxx` | Value is the tag byte itself, 0–127. No more bytes to read for the value. |
+| `10xxxxxx` | String length = tag `& 0x3F` (the low 6 bits). Read that many raw bytes right after the tag — that's the string. |
+| `110xxxxx` | Read 1 more byte. Combine the tag's low 5 bits (high bits of the value) with the next byte (low 8 bits) into a 13-bit value, then sign-extend from bit 12. |
+| `1110xxxx` | Read 1 more byte. String length = (tag `& 0x0F`) shifted left 8, OR'd with that byte — a 12-bit length. Read that many raw bytes as the string. |
+| `0xF0` | Read the next 4 bytes as a `uint32` string length. Read that many raw bytes as the string. |
+| `0xF1` | Read the next 2 bytes, sign-extend as a 16-bit int. |
+| `0xF2` | Read the next 3 bytes, sign-extend as a 24-bit int. |
+| `0xF3` | Read the next 4 bytes, sign-extend as a 32-bit int. |
+| `0xF4` | Read the next 8 bytes, sign-extend as a 64-bit int. |
+| `0xFF` | Not an entry — this is the end marker. Stop walking the listpack. |
+
+### Step 2 — turn the raw bytes into a Go value
+
+- **String tags** (`10xxxxxx`, `1110xxxx`, `0xF0`): the bytes just read *are* the string — no further conversion.
+- **Int tags** (everything else, except the 7-bit case which needs none): the bytes are a big-endian two's-complement integer, narrower than a normal Go `int`. Sign-extend it — copy the sign bit outward — before widening to `int64`, or a negative 13-bit value reads back as a large positive number instead of a negative one.
+- Whether the original command argument was typed as a string or a number, the RESP reply is always a bulk string — `LRANGE`/`LINDEX` convert the decoded int back to its decimal string form (e.g. `strconv.FormatInt`) before sending it to the client.
+
+### Step 3 — read backlen, advance the cursor
+
+After the tag and its data, one or more `backlen` bytes record the entry's own total length (tag + data, not counting `backlen` itself).
+
+- **Walking forward** (head to tail): you don't need `backlen` at all — the tag already told you how many data bytes follow, so the next entry starts right after `backlen`.
+- **Walking backward** (tail to head, e.g. for `RPOP` or a right-anchored `LRANGE`): `backlen` is exactly what makes this possible. Read the byte(s) immediately before the current entry — that's the *previous* entry's `backlen` — and step back that many bytes to land on the previous entry's tag byte.
+
+This backward-walk trick is the reason `backlen` exists at all — without it, a listpack could only be read start-to-end, never from the tail inward.
+
+### Worked example: decoding entry 2 from the earlier walkthrough
+
+```
+byte 13:    tag = 0x2A   (0 0101010 → top bit 0 → 7-bit uint)
+```
+
+- Tag pattern `0xxxxxxx` matches. Value = `0x2A` = 42, decoded directly from the tag byte. No extra data bytes to read.
+- `byte 14: backlen = 1` — confirms the whole entry (tag only) was 1 byte, matching what was just read.
+- Next entry starts at byte 15.
+
+### Loop until `0xFF`
+
+Decoding a whole listpack into a slice of values repeats Steps 1–3 from the first entry (byte 6, right after the 6-byte header) until the tag byte read is `0xFF` — that's the signal to stop, not a normal entry to decode.
+
 ## Performance vs. a naive linked list
 
 Naive = CS101 doubly linked list, one `struct listNode` (prev/next/value pointers) + one boxed value per element.
