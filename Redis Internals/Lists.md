@@ -113,6 +113,57 @@ Naive = CS101 doubly linked list, one `struct listNode` (prev/next/value pointer
 
 Big-O is the same for push/pop on both. The win is memory (10x+) and cache locality, not asymptotic complexity.
 
+## Pushing an Element: RPUSH and LPUSH
+
+A push does three things: find the target node, fit the new entry into that node's listpack, and update the quicklist's bookkeeping.
+
+### Step 1 — pick the target node
+
+- `RPUSH` targets the **tail** node.
+- `LPUSH` targets the **head** node.
+- If the quicklist has no nodes yet (a brand new key), create one node with an empty listpack (header + `0xFF` only). This node becomes both head and tail.
+
+### Step 2 — encode the entry
+
+Build the entry's bytes the same way as any listpack entry: pick a tag from the parse rules above (integer if the value parses as one, else string), write the tag plus data, then append the backlen byte(s). This is the encoding step already shown in "Listpack, byte by byte."
+
+### Step 3 — check room in the target node
+
+Compare the node's current listpack size plus the new entry's size against the node's byte cap (default `-2` = 8KB).
+
+- **Entry fits** — splice the entry into the node's listpack:
+  - `RPUSH`: insert the entry bytes just before the `0xFF` end marker.
+  - `LPUSH`: insert the entry bytes right after the 6-byte header, before the first existing entry.
+  - Update that listpack's `Size` and `Count` header fields.
+- **Entry does not fit** — open a new node:
+  - `RPUSH`: allocate a node after the current tail, link it in (`tail.Next = newNode`, `newNode.Prev = tail`), make it the new tail.
+  - `LPUSH`: allocate a node before the current head, link it in, make it the new head.
+  - Put the entry into the new node's (otherwise empty) listpack.
+  - `NumNodes += 1`.
+
+### Step 4 — update the quicklist
+
+- `Count += 1` for each element pushed.
+- `Head`/`Tail` pointers change only when step 3 opened a new node at that end.
+- The command reply is the quicklist's `Count` after all values in the command are pushed.
+
+### Multiple values in one command
+
+`RPUSH key a b c` and `LPUSH key a b c` push one element at a time, in argument order, repeating steps 1–4 for each value. A mid-command push can still trigger a new node if the current node fills up partway through the batch — each value re-checks room independently.
+
+`LPUSH key a b c` inserts `a` at the head first, then `b` at the new head, then `c` at the newest head. The result has `c` closest to the head — the reverse of argument order, because each element is inserted at the front in turn.
+
+## Edge Cases
+
+- **Head insert shifts bytes; tail insert does not.** A listpack is one flat byte array. Inserting at the tail is a plain append. Inserting at the head means moving every existing byte in that listpack forward to make room after the header. This cost is bounded by the node's size cap, so it stays inside the "O(1), amortized" claim in the performance table above, but it is not free the way a head insert in a real linked list would be.
+- **An entry larger than the node's byte cap.** A single large value (say, a multi-megabyte string) can exceed the node cap by itself. Real Redis handles this with a "plain" node that holds exactly one oversized element outside the normal listpack packing. Decide up front whether to support this case or assume all values stay under the cap.
+- **A batch push spans a node boundary.** `RPUSH key v1 v2 v3` where `v1` and `v2` fit in the current tail node but `v3` does not: `v3` needs a new node mid-command, and `NumNodes`/`Tail` must update partway through processing a single command.
+- **Integer vs. string encoding changes size, not identity.** `RPUSH key 42` stores `42` as a 1-byte integer entry, not as the 2-byte string `"42"`. `LRANGE`/`LINDEX` must decode the tag and convert back to the string `"42"` for the client — the RESP reply is always a bulk string, regardless of how the entry is packed internally.
+- **`Count` is a 2-byte field per listpack.** As written, `Listpack.Count` is `[2]byte`, so one listpack maxes out at 65535 entries before the count field itself overflows. The byte cap (8KB default) triggers a new node long before this limit in most cases, but a node cap set very high, or entries small enough (1-byte integers), could reach it.
+- **`backlen` is not always 1 byte.** The worked example above uses entries small enough that `backlen` fits in 1 byte. A longer entry needs more backlen bytes to record its own length. Decoding (walking the listpack backward) must handle a variable-width `backlen`, not assume a fixed 1 byte per entry.
+- **Growing `Entries []byte` can move the backing array.** Any code that holds a raw offset or sub-slice into a node's `Entries` before an insert must not reuse it after the insert — a `append`-driven grow can reallocate and copy, invalidating old pointers/offsets into the old array.
+- **Concurrent push and pop on the same key.** Splicing bytes into a listpack, and updating `Count`/`NumNodes`/`Head`/`Tail`, are multiple separate writes. Two goroutines pushing to the same key at once need a lock around the whole per-key sequence, not just around each individual field write.
+
 ## Sources
 
 - Redis source: `src/t_list.c`, `src/quicklist.c`, `src/listpack.c`
