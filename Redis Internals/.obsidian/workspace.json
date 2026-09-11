@@ -83,8 +83,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "b2d834ab48570358",
@@ -189,9 +188,10 @@
       "bases:Create new base": false
     }
   },
-  "active": "0515801625952235",
+  "active": "259d4a43d76a241b",
   "lastOpenFiles": [
-    "Streams.md",
-    "Lists.md"
+    "Lists.md",
+    "Bit manipulation Golang.md",
+    "Streams.md"
   ]
 }
