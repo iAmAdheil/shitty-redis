@@ -118,19 +118,28 @@ func decodeTag(tag byte) (int, int, bool) {
 // max entries to be read from the listpack
 // read all if m greater than elements in node
 // read -> count of no. of elements read
-func (lp *Listpack) Read(m int) (read int, elements []string) {
-	var i = 0 // current index
+func (lp *Listpack) Read(offset, m int) (elements []string) {
+	var i = 0    // current index
+	var read = 0 // count of total elements read
 
 	for i < len(lp.Entries) && lp.Entries[i] != 0xFF && read < m {
 		entry := []byte{}
 
+		// i -> tag, j -> next byte
 		tag := lp.Entries[i]
+		j := i + 1
 		// tagB -> bit count to be read from tag
 		// readB -> bit count to be read after tag, diff usecase
 		// for string and int
 		tagB, readB, isInt := decodeTag(tag)
 
 		if isInt {
+			if offset > 0 {
+				i += (1 + readB + 1) // tag + readB + backlen byte
+				offset--
+				continue
+			}
+
 			switch tagB {
 			case 7:
 				entry = append(entry, uint8(tag&0x7F))
@@ -138,7 +147,7 @@ func (lp *Listpack) Read(m int) (read int, elements []string) {
 				entry = append(entry, uint8(tag&0x1F))
 			}
 
-			for j := i + 1; j <= i+readB; j++ {
+			for ; j <= i+readB; j++ {
 				// 8(7), 16(13), 16, 24, 32, 64
 				entry = append(entry, lp.Entries[j])
 			}
@@ -156,13 +165,19 @@ func (lp *Listpack) Read(m int) (read int, elements []string) {
 				entry = append(entry, uint8(tag&0x0F))
 			}
 
-			j := i + 1
 			for ; j <= i+readB; j++ {
 				entry = append(entry, lp.Entries[j])
 			}
 
+			byteCount := int(bytesToUint64BE(entry)) // count of total string (value) bytes to be read
+
+			if offset > 0 {
+				i += (1 + readB + byteCount + 1) // tag + readB + string bytes + backlen byte
+				offset--
+				continue
+			}
+
 			val := []byte{}
-			byteCount := bytesToUint64BE(entry) // count of total string (value) bytes to be read
 			// read byteCounts starting from j
 			for byteCount != 0 {
 				val = append(val, lp.Entries[j])
@@ -172,26 +187,10 @@ func (lp *Listpack) Read(m int) (read int, elements []string) {
 
 			elements = append(elements, string(val))
 		}
+
+		// j's final position -> backlen byte
+		i = j + 1
 	}
 
-	return read, elements
+	return elements
 }
-
-// func (lp *Listpack) ListRange(l, r int32) []string {
-// 	// int16 -> int32 : no information loss + leading bit is 0
-// 	// prevents count from going negative during conversion if leading bit was 1
-// 	size := int32(lp.GetCount())
-// 	// max index for the list
-// 	rmax := size - 1
-
-// 	if l < 0 {
-// 		l = max(0, size-(l*-1))
-// 	}
-// 	if r < 0 {
-// 		r = max(0, size-(r*-1))
-// 	}
-
-// 	if l > r || l > rmax {
-// 		return nil
-// 	}
-// }

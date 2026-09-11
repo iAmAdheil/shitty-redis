@@ -70,7 +70,7 @@ func (q *List) LPUSH(items []string) {
 		q.Head = node
 		q.Tail = node
 	} else {
-		node = q.Tail
+		node = q.Head
 	}
 
 	for _, v := range items {
@@ -89,4 +89,9 @@ func (q *List) LPUSH(items []string) {
 			}
 		}
 	}
+}
+
+// only supports forward direction reading for now
+// will add backward reading in the future
+func (q *List) LRANGE(l, r int64) {
 }
