@@ -228,6 +228,131 @@ func TestLRANGE_AcrossNodeBoundary(t *testing.T) {
 	}
 }
 
+func TestLLEN_EmptyList(t *testing.T) {
+	q := NewQuicklist()
+
+	if got := q.LLEN(); got != 0 {
+		t.Errorf("LLEN() on an empty list = %d, want 0", got)
+	}
+}
+
+func TestLLEN_AfterPushes(t *testing.T) {
+	q := NewQuicklist()
+	q.RPUSH([]string{"a", "b", "c"})
+
+	if got := q.LLEN(); got != 3 {
+		t.Errorf("LLEN() = %d, want 3", got)
+	}
+}
+
+func TestLLEN_TracksPops(t *testing.T) {
+	q := NewQuicklist()
+	q.RPUSH([]string{"a", "b", "c"})
+	q.LPOP(2)
+
+	if got := q.LLEN(); got != 1 {
+		t.Errorf("LLEN() after popping 2 of 3 elements = %d, want 1", got)
+	}
+}
+
+func TestLPOP_SingleElement(t *testing.T) {
+	q := NewQuicklist()
+	q.RPUSH([]string{"a", "b", "c"})
+
+	got := q.LPOP(1)
+	want := []string{"a"}
+	if !equalStrings(got, want) {
+		t.Errorf("LPOP(1) = %v, want %v", got, want)
+	}
+
+	remaining := q.LRANGE(0, -1)
+	wantRemaining := []string{"b", "c"}
+	if !equalStrings(remaining, wantRemaining) {
+		t.Errorf("LRANGE(0,-1) after LPOP(1) = %v, want %v", remaining, wantRemaining)
+	}
+}
+
+func TestLPOP_MultipleElements(t *testing.T) {
+	q := NewQuicklist()
+	q.RPUSH([]string{"a", "b", "c", "d", "e"})
+
+	got := q.LPOP(3)
+	want := []string{"a", "b", "c"}
+	if !equalStrings(got, want) {
+		t.Errorf("LPOP(3) = %v, want %v", got, want)
+	}
+	if q.Count != 2 {
+		t.Errorf("Count after LPOP(3) = %d, want 2", q.Count)
+	}
+}
+
+func TestLPOP_CountExceedsLength_PopsAllAndEmptiesList(t *testing.T) {
+	q := NewQuicklist()
+	q.RPUSH([]string{"a", "b", "c"})
+
+	got := q.LPOP(10)
+	want := []string{"a", "b", "c"}
+	if !equalStrings(got, want) {
+		t.Errorf("LPOP(10) = %v, want %v", got, want)
+	}
+	if q.Count != 0 {
+		t.Errorf("Count after popping more than the list holds = %d, want 0", q.Count)
+	}
+	if q.Head != nil {
+		t.Errorf("Head = %v, want nil once the list is fully popped", q.Head)
+	}
+	if q.Tail != nil {
+		t.Errorf("Tail = %v, want nil once the list is fully popped", q.Tail)
+	}
+	if q.NumNodes != 0 {
+		t.Errorf("NumNodes = %d, want 0 once the list is fully popped", q.NumNodes)
+	}
+}
+
+func TestLPOP_EmptyList_ReturnsEmpty(t *testing.T) {
+	q := NewQuicklist()
+
+	got := q.LPOP(1)
+	if len(got) != 0 {
+		t.Errorf("LPOP(1) on an empty list = %v, want empty", got)
+	}
+}
+
+func TestLPOP_ZeroCount_ReturnsEmpty(t *testing.T) {
+	q := NewQuicklist()
+	q.RPUSH([]string{"a", "b", "c"})
+
+	got := q.LPOP(0)
+	if len(got) != 0 {
+		t.Errorf("LPOP(0) = %v, want empty", got)
+	}
+	if q.Count != 3 {
+		t.Errorf("Count after LPOP(0) = %d, want unchanged at 3", q.Count)
+	}
+}
+
+func TestLPOP_AcrossNodeBoundary(t *testing.T) {
+	q := NewQuicklist()
+
+	items := make([]string, 100)
+	for i := range items {
+		items[i] = strconv.Itoa(i) + strings.Repeat("x", 100)
+	}
+	q.RPUSH(items)
+
+	if q.NumNodes < 2 {
+		t.Fatalf("NumNodes = %d, want at least 2 before popping across a node boundary", q.NumNodes)
+	}
+
+	got := q.LPOP(q.Count)
+	if !equalStrings(got, items) {
+		t.Errorf("LPOP(all) did not return every item in insertion order across nodes")
+	}
+	if q.Head != nil || q.Tail != nil || q.NumNodes != 0 {
+		t.Errorf("list not fully drained: Head=%v Tail=%v NumNodes=%d", q.Head, q.Tail, q.NumNodes)
+	}
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

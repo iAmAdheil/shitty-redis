@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Lists.md",
+                "file": "Running tests in Go.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Lists"
+              "title": "Running tests in Go"
             }
           }
         ]
@@ -190,8 +190,9 @@
   },
   "active": "0515801625952235",
   "lastOpenFiles": [
-    "Bit manipulation Golang.md",
     "Lists.md",
+    "Running tests in Go.md",
+    "Bit manipulation Golang.md",
     "Streams.md"
   ]
 }

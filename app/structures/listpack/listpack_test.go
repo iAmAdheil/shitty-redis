@@ -245,6 +245,113 @@ func TestGetCount_TracksEntriesAdded(t *testing.T) {
 	}
 }
 
+func TestPopL_SingleString(t *testing.T) {
+	lp := NewListpack()
+	if err := lp.PushR("hello"); err != nil {
+		t.Fatalf("PushR returned an error: %v", err)
+	}
+
+	got, err := lp.PopL()
+	if err != nil {
+		t.Fatalf("PopL returned an error: %v", err)
+	}
+	if got != "hello" {
+		t.Errorf("PopL() = %q, want %q", got, "hello")
+	}
+	if count := lp.GetCount(); count != 0 {
+		t.Errorf("GetCount() after popping the only entry = %d, want 0", count)
+	}
+}
+
+func TestPopL_MultipleStrings_FIFOOrder(t *testing.T) {
+	lp := NewListpack()
+	items := []string{"a", "b", "c"}
+	for _, v := range items {
+		if err := lp.PushR(v); err != nil {
+			t.Fatalf("PushR(%q) returned an error: %v", v, err)
+		}
+	}
+
+	// PopL always removes from the left. Pushed via PushR (append at
+	// tail), so popping must return the items in original order.
+	for _, want := range items {
+		got, err := lp.PopL()
+		if err != nil {
+			t.Fatalf("PopL() returned an error: %v", err)
+		}
+		if got != want {
+			t.Errorf("PopL() = %q, want %q", got, want)
+		}
+	}
+}
+
+func TestPopL_Integer_RoundTrip(t *testing.T) {
+	lp := NewListpack()
+	if err := lp.PushR("42"); err != nil {
+		t.Fatalf("PushR returned an error: %v", err)
+	}
+
+	got, err := lp.PopL()
+	if err != nil {
+		t.Fatalf("PopL returned an error: %v", err)
+	}
+	if got != "42" {
+		t.Errorf("PopL() = %q, want %q", got, "42")
+	}
+}
+
+func TestPopL_UpdatesSizeAndCount(t *testing.T) {
+	lp := NewListpack()
+	if err := lp.PushR("a"); err != nil {
+		t.Fatalf("PushR returned an error: %v", err)
+	}
+	if err := lp.PushR("b"); err != nil {
+		t.Fatalf("PushR returned an error: %v", err)
+	}
+
+	sizeBefore := lp.GetSize()
+	if _, err := lp.PopL(); err != nil {
+		t.Fatalf("PopL returned an error: %v", err)
+	}
+
+	if count := lp.GetCount(); count != 1 {
+		t.Errorf("GetCount() after one pop = %d, want 1", count)
+	}
+	if size := lp.GetSize(); size >= sizeBefore {
+		t.Errorf("GetSize() after one pop = %d, want less than %d (size must shrink by the popped entry's byte length)", size, sizeBefore)
+	}
+}
+
+func TestPopL_EmptyListpack_ReturnsError(t *testing.T) {
+	lp := NewListpack()
+
+	if _, err := lp.PopL(); err == nil {
+		t.Errorf("PopL on an empty listpack must return an error")
+	}
+}
+
+func TestPopL_ThenPushR_StillReadable(t *testing.T) {
+	lp := NewListpack()
+	for _, v := range []string{"a", "b", "c"} {
+		if err := lp.PushR(v); err != nil {
+			t.Fatalf("PushR(%q) returned an error: %v", v, err)
+		}
+	}
+
+	if _, err := lp.PopL(); err != nil {
+		t.Fatalf("PopL returned an error: %v", err)
+	}
+	if err := lp.PushR("d"); err != nil {
+		t.Fatalf("PushR(%q) returned an error: %v", "d", err)
+	}
+
+	got := lp.Read(0, 3)
+	want := []string{"b", "c", "d"}
+	if !equal(got, want) {
+		t.Errorf("Read(0,3) after PopL+PushR = %v, want %v", got, want)
+	}
+}
+
 func equal(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

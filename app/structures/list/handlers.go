@@ -120,3 +120,40 @@ func (q *List) LRANGE(l, r int) (elements []string) {
 func (q *List) LLEN() int {
 	return q.Count
 }
+
+func (q *List) LPOP(c int) (elements []string) {
+	var node *Node = q.Head
+
+	for c > 0 && node != nil {
+		ele, err := node.Listpack.PopL()
+		// fails if node empty, change head, drop node
+		if err != nil {
+			q.Head = node.Next
+			node = q.Head
+			if node != nil {
+				node.Prev = nil
+			}
+			q.NumNodes--
+		} else {
+			elements = append(elements, ele)
+			q.Count--
+			c--
+		}
+	}
+
+	if node != nil && node.Listpack.GetCount() == 0 {
+		q.Head = node.Next
+		node = q.Head
+		if node != nil {
+			node.Prev = nil
+		}
+		q.NumNodes--
+	}
+
+	// empty list, 0 nodes left
+	if q.Head == nil {
+		q.Tail = nil
+	}
+
+	return elements
+}
