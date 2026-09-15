@@ -203,6 +203,44 @@ Compare the node's current listpack size plus the new entry's size against the n
 
 `LPUSH key a b c` inserts `a` at the head first, then `b` at the new head, then `c` at the newest head. The result has `c` closest to the head — the reverse of argument order, because each element is inserted at the front in turn.
 
+## Popping an Element: LPOP and RPOP
+
+A pop is a push in reverse, with one extra wrinkle: it can shrink a node down to nothing, which means the quicklist may need to drop a node — something a push never has to do.
+
+### Step 1 — pick the source node
+
+- `LPOP` targets the **head** node.
+- `RPOP` targets the **tail** node.
+- If the quicklist has no nodes (`NumNodes == 0`), there is nothing to pop — return nil, no further steps.
+
+### Step 2 — decode the target entry
+
+- `LPOP`: the entry starts right after the listpack header — the same starting point `Read`/`LRANGE` uses for offset 0.
+- `RPOP`: the entry sits right before the `0xFF` end marker. Find it via the backward-walk trick from "Parsing an Entry Back": read the `backlen` byte(s) immediately before `0xFF`, step back that many bytes, and land on the last entry's tag.
+- Decode it the same way as any entry (tag → value), but for a pop this decode step is doing two jobs at once: recovering the **value** for the command's reply, and recovering the entry's **total byte length** (tag + data + `backlen`) — the only way to know how many bytes to cut out in the next step. A listpack has no notion of "element 0"; it only has bytes, so you cannot remove "one element" without first finding out how many bytes it occupies.
+
+### Step 3 — splice the entry out, update the listpack header
+
+Let `n` be the decoded entry's total byte length.
+
+- `LPOP`: new `Entries` = old `Entries[n:]` — drop the first `n` bytes, keep the rest (including the trailing `0xFF`) unchanged.
+- `RPOP`: new `Entries` = old `Entries[:start]` with `0xFF` appended back, where `start` is the byte offset Step 2 walked back to.
+- Either way, update that listpack's `Size` (`-n`) and `Count` (`-1`) header fields.
+- Nothing about the *surviving* entries needs to change. Each entry's `backlen` describes only itself, not its neighbors, so the remaining bytes are correct as-is — just sitting at a new offset within the array.
+
+### Step 4 — update the quicklist
+
+- `Count -= 1` on the quicklist.
+- Check whether the source node's listpack `Count` just reached 0. If it did, that node is now empty and gets unlinked:
+  - `LPOP`: `Head = Head.Next`; if the new `Head` is not nil, set `Head.Prev = nil`; if it is nil (the list just became empty), set `Tail = nil` too.
+  - `RPOP`: mirror at the tail — `Tail = Tail.Prev`; if not nil, `Tail.Next = nil`; else `Head = nil` too.
+  - `NumNodes -= 1`.
+- The reply is the popped value, decoded back to its string form the same way `LRANGE` does (e.g. `strconv.FormatInt` for an integer entry).
+
+### `LPOP key count` — popping more than one
+
+Repeat Steps 1–4 up to `count` times, or until the list runs out of elements, whichever comes first. Collect each popped value in pop order for the RESP array reply. If the source node empties and gets unlinked partway through, the next iteration just re-reads `Head` (or `Tail`) — it does not need to know a node boundary was crossed; Step 1 already picks whatever node is current.
+
 ## Edge Cases
 
 - **Head insert shifts bytes; tail insert does not.** A listpack is one flat byte array. Inserting at the tail is a plain append. Inserting at the head means moving every existing byte in that listpack forward to make room after the header. This cost is bounded by the node's size cap, so it stays inside the "O(1), amortized" claim in the performance table above, but it is not free the way a head insert in a real linked list would be.

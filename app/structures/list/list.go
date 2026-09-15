@@ -4,7 +4,7 @@ package list
 import "github.com/codecrafters-io/redis-starter-go/app/structures/listpack"
 
 type List struct {
-	Count    int
+	Count    int // element count
 	NumNodes int
 	Head     *Node
 	Tail     *Node
@@ -31,67 +31,4 @@ func NewNode() *Node {
 		Next:     nil,
 		Listpack: listpack.NewListpack(),
 	}
-}
-
-func (q *List) RPUSH(items []string) {
-	var node *Node
-	// pick target node
-	if q.Head == nil && q.Tail == nil {
-		node = NewNode()
-		q.Head = node
-		q.Tail = node
-	} else {
-		node = q.Tail
-	}
-
-	for _, v := range items {
-		if err := node.Listpack.PushR(v); err != nil {
-			// create a new node and make it the tail node
-			// next entries will go into this node
-			node = NewNode()
-			q.Tail.Next = node
-			node.Prev = q.Tail
-			q.Tail = node
-
-			// unexpected error
-			// inserting into an empty listpack
-			if err := node.Listpack.PushR(v); err != nil {
-				panic("Unexpected error: inserting element into an empty Listpack")
-			}
-		}
-	}
-}
-
-func (q *List) LPUSH(items []string) {
-	var node *Node
-	// pick target node
-	if q.Head == nil && q.Tail == nil {
-		node = NewNode()
-		q.Head = node
-		q.Tail = node
-	} else {
-		node = q.Head
-	}
-
-	for _, v := range items {
-		if err := node.Listpack.PushL(v); err != nil {
-			// create a new node and make it the tail node
-			// next entries will go into this node
-			node = NewNode()
-			q.Head.Prev = node
-			node.Next = q.Head
-			q.Head = node
-
-			// unexpected error
-			// inserting into an empty listpack
-			if err := node.Listpack.PushL(v); err != nil {
-				panic("Unexpected error: inserting element into an empty Listpack")
-			}
-		}
-	}
-}
-
-// only supports forward direction reading for now
-// will add backward reading in the future
-func (q *List) LRANGE(l, r int64) {
 }

@@ -30,8 +30,23 @@ func (lp *Listpack) GetSize() uint32 {
 	return binary.BigEndian.Uint32(lp.size[:])
 }
 
+func (lp *Listpack) UpdateSize(v int) {
+	// pad with 0s, still a +ve value
+	s := int64(binary.BigEndian.Uint32(lp.size[:]))
+	s = max(0, s+int64(v))
+
+	binary.BigEndian.PutUint32(lp.size[:], uint32(s))
+}
+
 func (lp *Listpack) GetCount() uint16 {
 	return binary.BigEndian.Uint16(lp.count[:])
+}
+
+func (lp *Listpack) UpdateCount(v int) {
+	s := int32(binary.BigEndian.Uint16(lp.count[:]))
+	s = max(0, s+int32(v))
+
+	binary.BigEndian.PutUint16(lp.count[:], uint16(s))
 }
 
 // returns an error if the listpack does not have sufficient space for the entry to fit in
@@ -60,6 +75,9 @@ func (lp *Listpack) PushR(item string) error {
 	lp.Entries = append(lp.Entries, entry...)
 	lp.Entries = append(lp.Entries, end)
 
+	lp.UpdateSize(len(entry))
+	lp.UpdateCount(1)
+
 	return nil
 }
 
@@ -82,6 +100,9 @@ func (lp *Listpack) PushL(item string) error {
 	}
 
 	lp.Entries = append(entry, lp.Entries...)
+
+	lp.UpdateSize(len(entry))
+	lp.UpdateCount(1)
 
 	return nil
 }
@@ -152,8 +173,17 @@ func (lp *Listpack) Read(offset, m int) (elements []string) {
 				entry = append(entry, lp.Entries[j])
 			}
 
-			bitCount := uint(tagB + 8*readB)
-			val := signExtend(entry, bitCount)
+			var val int64
+			switch tagB {
+			case 7:
+				// 7 bit int, no possible -ve ints
+				// convert the 7 bit int to a 64 bit uint (padding)
+				// transform into int64 (no diff, leading bit always 0)
+				val = int64(bytesToUint64BE(entry))
+			default:
+				bitCount := uint(tagB + 8*readB)
+				val = signExtend(entry, bitCount)
+			}
 
 			elements = append(elements, strconv.FormatInt(val, 10))
 
@@ -187,7 +217,7 @@ func (lp *Listpack) Read(offset, m int) (elements []string) {
 
 			elements = append(elements, string(val))
 		}
-
+		read++
 		// j's final position -> backlen byte
 		i = j + 1
 	}

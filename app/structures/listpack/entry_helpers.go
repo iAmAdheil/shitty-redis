@@ -38,7 +38,6 @@ func handleIntEntry(val int64) (entry []byte) {
 
 	switch totalBytes {
 	case 1:
-		entry = append(entry, tag)
 	case 2:
 		// Mask to 13 bits (0x1FFF is 13 ones in binary)
 		// This automatically converts negative numbers into their
@@ -112,7 +111,7 @@ func handleStrEntry(val string) (entry []byte) {
 	case 2:
 		lenB := uint16(len(itemB) & 0x0FFF)
 
-		byte1 := tag | uint8(lenB<<8)
+		byte1 := tag | uint8(lenB>>8)
 		byte2 := uint8(lenB)
 
 		entry[0] = byte1
