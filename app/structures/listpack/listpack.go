@@ -15,7 +15,7 @@ type Listpack struct {
 
 // **Store follows big endian notation everywhere**
 
-func NewListpack() *Listpack {
+func New() *Listpack {
 	s := [4]byte{}
 	binary.BigEndian.PutUint32(s[:], 7)
 

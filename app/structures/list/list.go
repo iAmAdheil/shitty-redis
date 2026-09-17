@@ -16,7 +16,7 @@ type Node struct {
 	Listpack *listpack.Listpack
 }
 
-func NewQuicklist() *List {
+func New() *List {
 	return &List{
 		Count:    0,
 		NumNodes: 0,
@@ -29,6 +29,6 @@ func NewNode() *Node {
 	return &Node{
 		Prev:     nil,
 		Next:     nil,
-		Listpack: listpack.NewListpack(),
+		Listpack: listpack.New(),
 	}
 }

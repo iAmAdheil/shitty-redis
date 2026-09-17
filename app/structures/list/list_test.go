@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewQuicklist_InitialState(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 
 	if q.Count != 0 {
 		t.Errorf("Count = %d, want 0", q.Count)
@@ -24,7 +24,7 @@ func TestNewQuicklist_InitialState(t *testing.T) {
 }
 
 func TestRPUSH_Basic(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	if q.Count != 3 {
@@ -45,7 +45,7 @@ func TestRPUSH_Basic(t *testing.T) {
 }
 
 func TestLPUSH_Basic(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.LPUSH([]string{"a", "b", "c"})
 
 	if q.Count != 3 {
@@ -62,7 +62,7 @@ func TestLPUSH_Basic(t *testing.T) {
 }
 
 func TestRPUSH_ThenLPUSH_Combined(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"b", "c"})
 	q.LPUSH([]string{"a"})
 
@@ -74,7 +74,7 @@ func TestRPUSH_ThenLPUSH_Combined(t *testing.T) {
 }
 
 func TestLRANGE_NegativeIndices(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c", "d", "e"})
 
 	got := q.LRANGE(-3, -1)
@@ -85,7 +85,7 @@ func TestLRANGE_NegativeIndices(t *testing.T) {
 }
 
 func TestLRANGE_NegativeIndexClampsToStart(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	got := q.LRANGE(-100, -1)
@@ -96,7 +96,7 @@ func TestLRANGE_NegativeIndexClampsToStart(t *testing.T) {
 }
 
 func TestLRANGE_StartBeyondEnd_ReturnsEmpty(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	got := q.LRANGE(10, 20)
@@ -106,7 +106,7 @@ func TestLRANGE_StartBeyondEnd_ReturnsEmpty(t *testing.T) {
 }
 
 func TestLRANGE_StartAfterEnd_ReturnsEmpty(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	got := q.LRANGE(2, 1)
@@ -116,7 +116,7 @@ func TestLRANGE_StartAfterEnd_ReturnsEmpty(t *testing.T) {
 }
 
 func TestLRANGE_EndBeyondSize_Clamps(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	got := q.LRANGE(0, 100)
@@ -127,7 +127,7 @@ func TestLRANGE_EndBeyondSize_Clamps(t *testing.T) {
 }
 
 func TestLRANGE_EmptyList(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 
 	got := q.LRANGE(0, -1)
 	if len(got) != 0 {
@@ -136,7 +136,7 @@ func TestLRANGE_EmptyList(t *testing.T) {
 }
 
 func TestLRANGE_SingleElement(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"only"})
 
 	got := q.LRANGE(0, -1)
@@ -152,7 +152,7 @@ func TestLRANGE_SingleElement(t *testing.T) {
 }
 
 func TestRPUSH_NodeOverflow_CreatesNewNode(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 
 	// Push enough data that one listpack node cannot hold it all, so
 	// RPUSH must start a new tail node partway through.
@@ -179,7 +179,7 @@ func TestRPUSH_NodeOverflow_CreatesNewNode(t *testing.T) {
 }
 
 func TestLPUSH_NodeOverflow_CreatesNewNode(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 
 	items := make([]string, 100)
 	for i := range items {
@@ -211,7 +211,7 @@ func TestLPUSH_NodeOverflow_CreatesNewNode(t *testing.T) {
 }
 
 func TestLRANGE_AcrossNodeBoundary(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 
 	items := make([]string, 100)
 	for i := range items {
@@ -229,7 +229,7 @@ func TestLRANGE_AcrossNodeBoundary(t *testing.T) {
 }
 
 func TestLLEN_EmptyList(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 
 	if got := q.LLEN(); got != 0 {
 		t.Errorf("LLEN() on an empty list = %d, want 0", got)
@@ -237,7 +237,7 @@ func TestLLEN_EmptyList(t *testing.T) {
 }
 
 func TestLLEN_AfterPushes(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	if got := q.LLEN(); got != 3 {
@@ -246,7 +246,7 @@ func TestLLEN_AfterPushes(t *testing.T) {
 }
 
 func TestLLEN_TracksPops(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 	q.LPOP(2)
 
@@ -256,7 +256,7 @@ func TestLLEN_TracksPops(t *testing.T) {
 }
 
 func TestLPOP_SingleElement(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	got := q.LPOP(1)
@@ -273,7 +273,7 @@ func TestLPOP_SingleElement(t *testing.T) {
 }
 
 func TestLPOP_MultipleElements(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c", "d", "e"})
 
 	got := q.LPOP(3)
@@ -287,7 +287,7 @@ func TestLPOP_MultipleElements(t *testing.T) {
 }
 
 func TestLPOP_CountExceedsLength_PopsAllAndEmptiesList(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	got := q.LPOP(10)
@@ -310,7 +310,7 @@ func TestLPOP_CountExceedsLength_PopsAllAndEmptiesList(t *testing.T) {
 }
 
 func TestLPOP_EmptyList_ReturnsEmpty(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 
 	got := q.LPOP(1)
 	if len(got) != 0 {
@@ -319,7 +319,7 @@ func TestLPOP_EmptyList_ReturnsEmpty(t *testing.T) {
 }
 
 func TestLPOP_ZeroCount_ReturnsEmpty(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
 	got := q.LPOP(0)
@@ -332,7 +332,7 @@ func TestLPOP_ZeroCount_ReturnsEmpty(t *testing.T) {
 }
 
 func TestLPOP_AcrossNodeBoundary(t *testing.T) {
-	q := NewQuicklist()
+	q := New()
 
 	items := make([]string, 100)
 	for i := range items {

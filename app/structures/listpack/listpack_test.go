@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewListpack_InitialState(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 
 	if got := lp.GetSize(); got != 7 {
 		t.Errorf("GetSize() = %d, want 7 (empty header + terminator byte)", got)
@@ -22,7 +22,7 @@ func TestNewListpack_InitialState(t *testing.T) {
 }
 
 func TestPushR_SingleString(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	if err := lp.PushR("hello"); err != nil {
 		t.Fatalf("PushR returned an error: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestPushR_SingleString(t *testing.T) {
 }
 
 func TestPushR_MultipleStrings_PreserveOrder(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	items := []string{"a", "b", "c"}
 	for _, v := range items {
 		if err := lp.PushR(v); err != nil {
@@ -50,7 +50,7 @@ func TestPushR_MultipleStrings_PreserveOrder(t *testing.T) {
 }
 
 func TestPushL_SingleString(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	if err := lp.PushL("hello"); err != nil {
 		t.Fatalf("PushL returned an error: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestPushL_SingleString(t *testing.T) {
 }
 
 func TestPushL_MultipleStrings_PrependOrder(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 
 	// Each PushL call must insert at the front. The last item pushed
 	// must come back first when the listpack is read.
@@ -95,7 +95,7 @@ func TestPushR_Integers_RoundTrip(t *testing.T) {
 	for _, v := range values {
 		s := strconv.FormatInt(v, 10)
 		t.Run(s, func(t *testing.T) {
-			lp := NewListpack()
+			lp := New()
 			if err := lp.PushR(s); err != nil {
 				t.Fatalf("PushR(%q) returned an error: %v", s, err)
 			}
@@ -116,7 +116,7 @@ func TestPushR_Strings_VariousLengths(t *testing.T) {
 
 	for _, l := range lengths {
 		t.Run(strconv.Itoa(l), func(t *testing.T) {
-			lp := NewListpack()
+			lp := New()
 			s := strings.Repeat("x", l)
 			if err := lp.PushR(s); err != nil {
 				t.Fatalf("PushR(len=%d) returned an error: %v", l, err)
@@ -132,7 +132,7 @@ func TestPushR_Strings_VariousLengths(t *testing.T) {
 }
 
 func TestRead_WithOffset(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	for _, v := range []string{"a", "b", "c", "d"} {
 		if err := lp.PushR(v); err != nil {
 			t.Fatalf("PushR(%q) returned an error: %v", v, err)
@@ -147,7 +147,7 @@ func TestRead_WithOffset(t *testing.T) {
 }
 
 func TestRead_MoreThanAvailable(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	items := []string{"a", "b", "c"}
 	for _, v := range items {
 		if err := lp.PushR(v); err != nil {
@@ -162,7 +162,7 @@ func TestRead_MoreThanAvailable(t *testing.T) {
 }
 
 func TestRead_ZeroCount(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	if err := lp.PushR("a"); err != nil {
 		t.Fatalf("PushR returned an error: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestRead_ZeroCount(t *testing.T) {
 }
 
 func TestPushR_FullListpack_ReturnsError(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	big := strings.Repeat("x", 4000)
 
 	pushed := 0
@@ -195,7 +195,7 @@ func TestPushR_FullListpack_ReturnsError(t *testing.T) {
 }
 
 func TestPushL_FullListpack_ReturnsError(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	big := strings.Repeat("x", 4000)
 
 	pushed := 0
@@ -216,7 +216,7 @@ func TestPushL_FullListpack_ReturnsError(t *testing.T) {
 }
 
 func TestGetSize_TracksBytesAdded(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	before := lp.GetSize()
 
 	entryBytes := getEntry("hello")
@@ -232,7 +232,7 @@ func TestGetSize_TracksBytesAdded(t *testing.T) {
 }
 
 func TestGetCount_TracksEntriesAdded(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	items := []string{"a", "b", "c"}
 	for _, v := range items {
 		if err := lp.PushR(v); err != nil {
@@ -246,7 +246,7 @@ func TestGetCount_TracksEntriesAdded(t *testing.T) {
 }
 
 func TestPopL_SingleString(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	if err := lp.PushR("hello"); err != nil {
 		t.Fatalf("PushR returned an error: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestPopL_SingleString(t *testing.T) {
 }
 
 func TestPopL_MultipleStrings_FIFOOrder(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	items := []string{"a", "b", "c"}
 	for _, v := range items {
 		if err := lp.PushR(v); err != nil {
@@ -286,7 +286,7 @@ func TestPopL_MultipleStrings_FIFOOrder(t *testing.T) {
 }
 
 func TestPopL_Integer_RoundTrip(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	if err := lp.PushR("42"); err != nil {
 		t.Fatalf("PushR returned an error: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestPopL_Integer_RoundTrip(t *testing.T) {
 }
 
 func TestPopL_UpdatesSizeAndCount(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	if err := lp.PushR("a"); err != nil {
 		t.Fatalf("PushR returned an error: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestPopL_UpdatesSizeAndCount(t *testing.T) {
 }
 
 func TestPopL_EmptyListpack_ReturnsError(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 
 	if _, err := lp.PopL(); err == nil {
 		t.Errorf("PopL on an empty listpack must return an error")
@@ -331,7 +331,7 @@ func TestPopL_EmptyListpack_ReturnsError(t *testing.T) {
 }
 
 func TestPopL_ThenPushR_StillReadable(t *testing.T) {
-	lp := NewListpack()
+	lp := New()
 	for _, v := range []string{"a", "b", "c"} {
 		if err := lp.PushR(v); err != nil {
 			t.Fatalf("PushR(%q) returned an error: %v", v, err)
