@@ -241,6 +241,69 @@ Let `n` be the decoded entry's total byte length.
 
 Repeat Steps 1–4 up to `count` times, or until the list runs out of elements, whichever comes first. Collect each popped value in pop order for the RESP array reply. If the source node empties and gets unlinked partway through, the next iteration just re-reads `Head` (or `Tail`) — it does not need to know a node boundary was crossed; Step 1 already picks whatever node is current.
 
+## Blocking Pop: BLPOP
+
+> **Prior art:** the wait/wake mechanism below (buffered channel per waiter, `select` against a timeout, re-check the wait queue under the lock to resolve races) is already implemented and working in `app/handlers.go`/`app/utils.go`, against an older `lists map[string]*[]string` representation that predates the quicklist. It's proven — the design here is that same mechanism, re-pointed at `List`/`Node`/`Listpack` instead of the old map. Nothing about the concurrency pattern needs to change, only what it synchronizes access to.
+
+`LPOP` on an empty list returns immediately with nothing. `BLPOP` is not allowed to give up that easily — if the list is empty, it must wait, for up to `timeout` seconds, for some other client to push a value.
+
+### What has to exist first
+
+None of this is wired up yet — `List`/`Node`/`Listpack` currently only exists as a standalone package exercised by tests, with nothing in `com.go`/`handlers.go` holding an instance of it. Before `BLPOP` (or any list command) can run against it, there needs to be:
+- a per-key registry, e.g. `map[string]*list.List`, plus a mutex guarding it — the `List` equivalent of the old `lists`/`lmu`.
+- a per-key waiter registry, e.g. `map[string][]chan string` — the `List` equivalent of the old `listch`. This one doesn't care what backs the list; it can be copied over unchanged.
+
+### Step 1 — data already there: no blocking needed
+
+Under the registry's lock, look up the key's `*List`. If it exists and `Count > 0`, this is a plain pop: call `list.LPOP(1)`, unlock, reply immediately. Same shape as a normal `LPOP`, just reached through a different command.
+
+### Step 2 — nothing there: register to wait
+
+If the key has no `*List` yet, or `Count == 0`, the client doesn't get a reply yet. Instead, still under the lock:
+
+- Create a channel: `ch := make(chan string, 1)`.
+- Append it to `listch[key]` — a per-key slice of channels, one per waiting client, in registration order.
+- Unlock and move on to waiting.
+
+**Why buffered with capacity 1, not unbuffered:** whichever client later pushes a value has to hand it to this channel without blocking — it's doing that send while holding the lock, so it cannot afford to wait around for this goroutine to be scheduled and ready to receive. A 1-slot buffer means the send always succeeds immediately and the pusher moves on, regardless of whether the waiter's `select` has even started running yet.
+
+### Step 3 — wait for a value or a timeout, whichever comes first
+
+```go
+select {
+case pop := <-ch:
+    // someone pushed — done
+case <-expch:
+    // timeout fired first
+}
+```
+
+`expch` comes from `time.After(duration)` when `timeout > 0`. When `timeout` is `0` (or negative), `expch` is never assigned, so it keeps its zero value: a nil channel. A receive on a nil channel never completes, so that `case` in the `select` simply never fires — "block forever" falls out of the zero value, with no separate `if timeout == 0` branch needed.
+
+### Step 4 — the producer side: push first, then pop-and-feed
+
+Every `RPUSH`/`LPUSH` call, after it finishes updating the list (`Count`, `NumNodes`, the listpack bytes — all of it, exactly as if no one were waiting), checks the waiter queue for that key and walks it in registration order — a FIFO queue. For as long as `list.Count > 0` and there are unserved waiters: call `list.LPOP(1)` to take the value at the head, send it into that waiter's channel, and count it as served. Stop early once the list runs dry. Afterward, trim the served waiters off the front of the slice, since they were served in the same front-to-back order they were stored — first client to call `BLPOP` is the first one woken.
+
+**Why push into the list first, instead of handing a pushed value straight to a waiter's channel and skipping the list entirely:**
+
+- **It reuses `List.LPOP` as-is.** `LPOP` already gets the hard parts right — listpack byte-splicing, node-draining, unlinking an emptied head node. A "straight to the channel" path would need a second, divergent way to decide and remove "the next value," largely duplicating what `LPOP` already does correctly.
+- **It gets ordering right for free.** A waiter must receive whatever value would actually be at the head of the list after the push lands — the same value a plain `LPOP` would return — regardless of whether the push was `RPUSH` (tail) or `LPUSH` (head). Storing then popping from the head reuses that logic instead of re-deriving "what's the head now" separately for `RPUSH` versus `LPUSH`.
+- **It handles a batch with mixed fates without extra bookkeeping.** `RPUSH key a b c` might satisfy zero, one, or all three waiters while the remainder stays queued. Push everything, then pop once per satisfied waiter — no need to decide, per value, before it's even inserted, whether it's "for a waiter" or "for the list."
+- The cost is real but small: a value handed to a waiter gets encoded into listpack bytes and immediately decoded back out. That only happens when a client is already blocked and waiting, not on a hot path, so it isn't worth optimizing away.
+
+### Step 5 — resolving the push-vs-timeout race
+
+The subtle part: what if the timeout and a push happen at almost the same moment? The `select`'s timeout branch re-acquires the lock and checks whether this waiter's channel is *still* sitting in `listch[key]`:
+
+- **Still there** — no push ever claimed it. Remove it from the queue and reply with a null array: genuinely timed out.
+- **Not there** — some push already removed it from the queue, which only happens in the same step where it sends the value via `LPOP`. A value is therefore guaranteed to already be sitting in the buffered channel, so read it (`<-ch`, which returns instantly — no blocking) and reply with that value instead of timing out.
+
+Both the producer step and this recheck run under the same lock, so "did anyone claim this waiter" is answered atomically with respect to any concurrent push. No lost wakeups, and no value ever gets handed to two different waiters.
+
+### Scope, for now
+
+Real `BLPOP key1 key2 ... timeout` waits on several keys at once and returns from whichever becomes ready first. Supporting only one key at a time is the deliberate scope right now, not a gap to chase yet — multi-key would mean registering the same waiter's channel under every key named in the call, and cleaning it up from all of them once any one fires, on top of everything above.
+
 ## Edge Cases
 
 - **Head insert shifts bytes; tail insert does not.** A listpack is one flat byte array. Inserting at the tail is a plain append. Inserting at the head means moving every existing byte in that listpack forward to make room after the header. This cost is bounded by the node's size cap, so it stays inside the "O(1), amortized" claim in the performance table above, but it is not free the way a head insert in a real linked list would be.

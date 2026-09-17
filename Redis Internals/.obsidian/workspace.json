@@ -4,21 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "9f22f9e74fb3e419",
+        "id": "79aebfeedb1a315b",
         "type": "tabs",
         "children": [
           {
-            "id": "0515801625952235",
+            "id": "abe679788025a5ab",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Running tests in Go.md",
-                "mode": "preview",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "Running tests in Go"
+              "title": "New tab"
             }
           }
         ]
@@ -188,11 +184,13 @@
       "bases:Create new base": false
     }
   },
-  "active": "0515801625952235",
+  "active": "abe679788025a5ab",
   "lastOpenFiles": [
+    "Streams.md",
+    "Concurrency.md",
+    "Keyspace.md",
     "Lists.md",
     "Running tests in Go.md",
-    "Bit manipulation Golang.md",
-    "Streams.md"
+    "Bit manipulation Golang.md"
   ]
 }

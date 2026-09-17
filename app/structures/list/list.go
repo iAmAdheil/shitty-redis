@@ -4,7 +4,7 @@ package list
 import "github.com/codecrafters-io/redis-starter-go/app/structures/listpack"
 
 type List struct {
-	Count    int // element count
+	count    int // element count
 	NumNodes int
 	Head     *Node
 	Tail     *Node
@@ -18,7 +18,7 @@ type Node struct {
 
 func New() *List {
 	return &List{
-		Count:    0,
+		count:    0,
 		NumNodes: 0,
 		Head:     nil,
 		Tail:     nil,

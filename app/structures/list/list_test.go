@@ -9,8 +9,8 @@ import (
 func TestNewQuicklist_InitialState(t *testing.T) {
 	q := New()
 
-	if q.Count != 0 {
-		t.Errorf("Count = %d, want 0", q.Count)
+	if q.LLEN() != 0 {
+		t.Errorf("Count = %d, want 0", q.LLEN())
 	}
 	if q.NumNodes != 0 {
 		t.Errorf("NumNodes = %d, want 0", q.NumNodes)
@@ -27,8 +27,8 @@ func TestRPUSH_Basic(t *testing.T) {
 	q := New()
 	q.RPUSH([]string{"a", "b", "c"})
 
-	if q.Count != 3 {
-		t.Errorf("Count = %d, want 3", q.Count)
+	if q.LLEN() != 3 {
+		t.Errorf("Count = %d, want 3", q.LLEN())
 	}
 	if q.NumNodes != 1 {
 		t.Errorf("NumNodes = %d, want 1", q.NumNodes)
@@ -48,8 +48,8 @@ func TestLPUSH_Basic(t *testing.T) {
 	q := New()
 	q.LPUSH([]string{"a", "b", "c"})
 
-	if q.Count != 3 {
-		t.Errorf("Count = %d, want 3", q.Count)
+	if q.LLEN() != 3 {
+		t.Errorf("Count = %d, want 3", q.LLEN())
 	}
 
 	// LPUSH inserts items one at a time at the head. The last item
@@ -162,8 +162,8 @@ func TestRPUSH_NodeOverflow_CreatesNewNode(t *testing.T) {
 	}
 	q.RPUSH(items)
 
-	if q.Count != len(items) {
-		t.Errorf("Count = %d, want %d", q.Count, len(items))
+	if q.LLEN() != len(items) {
+		t.Errorf("Count = %d, want %d", q.LLEN(), len(items))
 	}
 	if q.NumNodes < 2 {
 		t.Errorf("NumNodes = %d, want at least 2 once the data exceeds one node's capacity", q.NumNodes)
@@ -187,8 +187,8 @@ func TestLPUSH_NodeOverflow_CreatesNewNode(t *testing.T) {
 	}
 	q.LPUSH(items)
 
-	if q.Count != len(items) {
-		t.Errorf("Count = %d, want %d", q.Count, len(items))
+	if q.LLEN() != len(items) {
+		t.Errorf("Count = %d, want %d", q.LLEN(), len(items))
 	}
 	if q.NumNodes < 2 {
 		t.Errorf("NumNodes = %d, want at least 2 once the data exceeds one node's capacity", q.NumNodes)
@@ -281,8 +281,8 @@ func TestLPOP_MultipleElements(t *testing.T) {
 	if !equalStrings(got, want) {
 		t.Errorf("LPOP(3) = %v, want %v", got, want)
 	}
-	if q.Count != 2 {
-		t.Errorf("Count after LPOP(3) = %d, want 2", q.Count)
+	if q.LLEN() != 2 {
+		t.Errorf("Count after LPOP(3) = %d, want 2", q.LLEN())
 	}
 }
 
@@ -295,8 +295,8 @@ func TestLPOP_CountExceedsLength_PopsAllAndEmptiesList(t *testing.T) {
 	if !equalStrings(got, want) {
 		t.Errorf("LPOP(10) = %v, want %v", got, want)
 	}
-	if q.Count != 0 {
-		t.Errorf("Count after popping more than the list holds = %d, want 0", q.Count)
+	if q.LLEN() != 0 {
+		t.Errorf("Count after popping more than the list holds = %d, want 0", q.LLEN())
 	}
 	if q.Head != nil {
 		t.Errorf("Head = %v, want nil once the list is fully popped", q.Head)
@@ -326,8 +326,8 @@ func TestLPOP_ZeroCount_ReturnsEmpty(t *testing.T) {
 	if len(got) != 0 {
 		t.Errorf("LPOP(0) = %v, want empty", got)
 	}
-	if q.Count != 3 {
-		t.Errorf("Count after LPOP(0) = %d, want unchanged at 3", q.Count)
+	if q.LLEN() != 3 {
+		t.Errorf("Count after LPOP(0) = %d, want unchanged at 3", q.LLEN())
 	}
 }
 
@@ -344,7 +344,7 @@ func TestLPOP_AcrossNodeBoundary(t *testing.T) {
 		t.Fatalf("NumNodes = %d, want at least 2 before popping across a node boundary", q.NumNodes)
 	}
 
-	got := q.LPOP(q.Count)
+	got := q.LPOP(q.LLEN())
 	if !equalStrings(got, items) {
 		t.Errorf("LPOP(all) did not return every item in insertion order across nodes")
 	}

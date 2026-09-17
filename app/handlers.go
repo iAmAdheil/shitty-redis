@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/structures/list"
 )
 
 func (com *Com) ping() []byte {
@@ -15,30 +17,55 @@ func (com *Com) echo() []byte {
 	return RESPEncoder(com.Args["echothis"][0], Bulk)
 }
 
+func (com *Com) handleType() []byte {
+	key := com.Args["key"][0]
+
+	kmu.RLock()
+	defer kmu.RUnlock()
+
+	e, ok := keyspace[key]
+	if ok {
+		switch e.Type {
+		case TypeVar:
+			return RESPEncoder("string", Simple)
+		case TypeList:
+			return RESPEncoder("list", Simple)
+		case TypeStream:
+			return RESPEncoder("stream", Simple)
+		}
+	}
+
+	return RESPEncoder("none", Simple)
+}
+
 func (com *Com) get() []byte {
 	key := com.Args["key"][0]
 
-	vmu.Lock()
-	val, ok := vars[key]
-	defer vmu.Unlock()
+	kmu.RLock()
+	defer kmu.RUnlock()
 
+	e, ok := keyspace[key]
+	// DNE
 	if !ok {
 		return RESPEncoder(nil, NullBulk)
-	} else {
-		return RESPEncoder(val, Bulk)
 	}
+
+	v, ok := e.Data.(*string)
+	if !ok || e.Type != TypeVar {
+		// do something
+	}
+
+	return RESPEncoder(*v, Bulk)
 }
 
 func (com *Com) set() []byte {
 	key := com.Args["key"][0]
 	val := com.Args["value"][0]
 
-	vmu.Lock()
-	vars[key] = val
-	vmu.Unlock()
+	kmu.Lock()
+	keyspace[key] = NewStructure(TypeVar, &val)
+	kmu.Unlock()
 
-	// parts has an element at index 8 and index 10
-	// if parts has expiry args sent -> only then setup expiry
 	if len(com.Extras) > 0 {
 		expiryType := com.Extras["expiryType"][0]
 		dur := com.Extras["duration"][0]
@@ -53,109 +80,195 @@ func (com *Com) set() []byte {
 }
 
 func (com *Com) rpush() []byte {
-	listkey := com.Args["listkey"][0]
+	key := com.Args["key"][0]
 	values := com.Args["values"] // array of values
 
-	listsize := AddToList(listkey, values, 0)
+	kmu.Lock()
+	defer kmu.Unlock()
 
-	return RESPEncoder(strconv.Itoa(listsize), Int)
+	e, ok := keyspace[key]
+	// DNE
+	if !ok {
+		e = NewStructure(TypeList, list.New())
+		keyspace[key] = e
+	}
+
+	lp, ok := e.Data.(*list.List)
+	if e.Type != TypeList || !ok {
+		// do something
+	}
+
+	lp.RPUSH(values)
+
+	e.handleListeners(lp)
+
+	return RESPEncoder(lp.LLEN(), Int)
 }
 
 func (com *Com) lrange() []byte {
-	listkey := com.Args["listkey"][0]
+	key := com.Args["key"][0]
 	ls := com.Args["left"][0]
 	rs := com.Args["right"][0]
 
-	l, err := strconv.ParseInt(ls, 10, 0)
+	l, err := strconv.Atoi(ls)
 	if err != nil {
 		fmt.Printf("Error parsing the start index into an integer: %s\n", err.Error())
 	}
-	r, err := strconv.ParseInt(rs, 10, 0)
+	r, err := strconv.Atoi(rs)
 	if err != nil {
 		fmt.Printf("Error parsing the stop index into an integer: %s\n", err.Error())
 	}
 
-	out := GetListRange(listkey, int(l), int(r))
-	return RESPEncoder(out, BulkList)
+	var elements []string
+
+	kmu.RLock()
+	defer kmu.RUnlock()
+
+	e, ok := keyspace[key]
+	// DNE
+	if !ok {
+		return RESPEncoder(elements, BulkList)
+	}
+
+	lp, ok := e.Data.(*list.List)
+	if e.Type != TypeList || !ok {
+		// do something
+	}
+
+	elements = lp.LRANGE(l, r)
+
+	return RESPEncoder(elements, BulkList)
 }
 
 func (com *Com) lpush() []byte {
-	listkey := com.Args["listkey"][0]
-	values := com.Args["values"]
+	key := com.Args["key"][0]
+	values := com.Args["values"] // array of values
 
-	listsize := AddToList(listkey, values, 1)
+	kmu.Lock()
+	defer kmu.Unlock()
 
-	return RESPEncoder(strconv.Itoa(listsize), Int)
+	e, ok := keyspace[key]
+	// DNE
+	if !ok {
+		e = NewStructure(TypeList, list.New())
+		keyspace[key] = e
+	}
+
+	lp, ok := e.Data.(*list.List)
+	if e.Type != TypeList || !ok {
+		// do something
+	}
+
+	lp.LPUSH(values)
+
+	e.handleListeners(lp)
+
+	return RESPEncoder(lp.LLEN(), Int)
 }
 
 func (com *Com) llen() []byte {
-	listkey := com.Args["listkey"][0]
-	listsize := GetListLen(listkey)
+	key := com.Args["key"][0]
 
-	return RESPEncoder(strconv.Itoa(listsize), Int)
+	kmu.RLock()
+	defer kmu.RUnlock()
+
+	e, ok := keyspace[key]
+	// DNE
+	if !ok {
+		return RESPEncoder(0, Int)
+	}
+
+	lp, ok := e.Data.(*list.List)
+	if e.Type != TypeList || !ok {
+		// do something
+	}
+
+	return RESPEncoder(lp.LLEN(), Int)
 }
 
 func (com *Com) lpop() []byte {
-	listkey := com.Args["listkey"][0]
-	count, err := strconv.ParseInt(com.Args["count"][0], 10, 0)
+	key := com.Args["key"][0]
+	c, err := strconv.Atoi(com.Args["count"][0])
 	if err != nil {
 		// do something
 	}
 
 	out := []string{}
-	s, err := DeleteFromList(listkey, int(count), 1)
-	if err == nil {
-		out = append(out, s...)
+
+	kmu.Lock()
+	defer kmu.Unlock()
+
+	e, ok := keyspace[key]
+	// DNE
+	if !ok {
+		return RESPEncoder(nil, NullBulk)
 	}
 
-	if len(out) > 1 {
+	lp, ok := e.Data.(*list.List)
+	if e.Type != TypeList || !ok {
+		// do something
+	}
+
+	out = lp.LPOP(c)
+
+	// delete key when list is empty, 0 waiting listeners
+	if len(e.Listeners) == 0 && lp.LLEN() == 0 {
+		delete(keyspace, key)
+	}
+
+	if len(out) == 0 {
+		return RESPEncoder(nil, NullBulk)
+	} else if len(out) > 1 {
 		// bulk list
 		return RESPEncoder(out, BulkList)
 	}
-	// bulk string
-	return RESPEncoder(out, Bulk)
+	// len = 1 -> single element popped -> bulk string
+	return RESPEncoder(out[0], Bulk)
 }
 
 func (com *Com) blpop() []byte {
-	listkey := com.Args["listkey"][0]
-	ts := com.Args["timeout"][0]
+	key := com.Args["key"][0]
+	timeout, _ := strconv.ParseFloat(com.Args["timeout"][0], 32)
 
-	timeout, _ := strconv.ParseFloat(ts, 32)
+	var (
+		ch  chan string
+		out []string = []string{}
+		res []byte
+	)
 
-	var ch chan string
+	// key -> first part of RESP response
+	out = append(out, key)
 
-	out := []string{}
-	out = append(out, listkey)
+	kmu.Lock()
+	e, ok := keyspace[key]
+	// DNE
+	if !ok {
+		ch = make(chan string)
+		// create a new entry and push the listener
+		e = NewStructure(TypeList, list.New())
+		keyspace[key] = e
+		e.Listeners = append(e.Listeners, ch)
 
-	lmu.Lock()
-	l, ok := lists[listkey]
+	} else {
+		lp, ok := e.Data.(*list.List)
+		if e.Type != TypeList || !ok {
+			// do something
+		}
 
-	if !ok || len(*l) == 0 {
-		ch = make(chan string, 1)
-
-		lch, ok := listch[listkey]
-		if !ok {
-			lch = []chan string{ch}
+		if lp.LLEN() > 0 {
+			element := lp.LPOP(1)
+			out = append(out, element...)
+			res = RESPEncoder(out, BulkList)
 		} else {
-			lch = append(lch, ch)
+			ch = make(chan string)
+			e.Listeners = append(e.Listeners, ch)
 		}
-
-		listch[listkey] = lch
-
-	} else if len(*l) >= 1 {
-		s, err := DeleteFromList(listkey, 1, 1)
-		if err == nil {
-			out = append(out, s...)
-		}
-
-		// only reach this if list has elements available to pop
-		// imp. to release resource
-		lmu.Unlock()
-
-		return RESPEncoder(out, BulkList)
 	}
-
-	lmu.Unlock()
+	kmu.Unlock()
+	// unlock and exit
+	if res != nil {
+		return res
+	}
 
 	var expch <-chan time.Time
 	if timeout > 0 {
@@ -164,26 +277,27 @@ func (com *Com) blpop() []byte {
 		expch = time.After(duration)
 	}
 
-	var res []byte
-
 	select {
 	case pop := <-ch:
 		out = append(out, pop)
 		res = RESPEncoder(out, BulkList)
 
-	// lock to update channel slice
 	// after acquiring lock if channel found and popped -> return -1
 	// else value has been passed into channel -> process and return value
 	case <-expch:
-		lmu.Lock()
-		// check if chan is still in array
-		// true -> pop chan and return -1
-		lch := listch[listkey]
-		// handles nil channel list -> no need to check for ok
-		ulch, isExists := popChan(lch, ch)
+		kmu.Lock()
+		defer kmu.Unlock()
+
+		e, ok := keyspace[key]
+		// DNE
+		if !ok {
+			// something went wrong
+			// key got deleted with the client's listener(ch) missing
+		}
+
+		isExists := e.findAndPopCh(ch)
 		// channel popped from the list, no value pushed
 		if isExists {
-			listch[listkey] = ulch
 			res = RESPEncoder(nil, NullBulkList)
 		} else {
 			// false -> chan was filled just before timeout -> process and return happy path
@@ -191,33 +305,9 @@ func (com *Com) blpop() []byte {
 			out = append(out, pop)
 			res = RESPEncoder(out, BulkList)
 		}
-
-		lmu.Unlock()
 	}
 
 	return res
-}
-
-func (com *Com) handleType() []byte {
-	key := com.Args["key"][0]
-
-	// key in list
-	vmu.RLock()
-	defer vmu.RUnlock()
-	_, ok := vars[key]
-	if ok {
-		return RESPEncoder("string", Simple)
-	}
-
-	// key in stream
-	smu.RLock()
-	defer smu.RUnlock()
-	_, ok = streams[key]
-	if ok {
-		return RESPEncoder("stream", Simple)
-	}
-
-	return RESPEncoder("none", Simple)
 }
 
 func (com *Com) xadd() []byte {

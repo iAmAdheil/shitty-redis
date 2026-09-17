@@ -28,7 +28,7 @@ func (q *List) RPUSH(items []string) {
 				panic("Unexpected error: inserting element into an empty Listpack")
 			}
 		}
-		q.Count++
+		q.count++
 	}
 }
 
@@ -60,14 +60,14 @@ func (q *List) LPUSH(items []string) {
 				panic("Unexpected error: inserting element into an empty Listpack")
 			}
 		}
-		q.Count++
+		q.count++
 	}
 }
 
 // only supports forward direction reading for now
 // will add backward reading in the future
 func (q *List) LRANGE(l, r int) (elements []string) {
-	size := q.Count
+	size := q.count
 	// max index for the list
 	rmax := size - 1
 
@@ -118,7 +118,7 @@ func (q *List) LRANGE(l, r int) (elements []string) {
 }
 
 func (q *List) LLEN() int {
-	return q.Count
+	return q.count
 }
 
 func (q *List) LPOP(c int) (elements []string) {
@@ -136,7 +136,7 @@ func (q *List) LPOP(c int) (elements []string) {
 			q.NumNodes--
 		} else {
 			elements = append(elements, ele)
-			q.Count--
+			q.count--
 			c--
 		}
 	}
