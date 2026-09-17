@@ -133,8 +133,8 @@ func RESPEncoder(res any, t EncodeType) []byte {
 		}
 
 	case Int:
-		if val, ok := res.(string); ok {
-			s = fmt.Sprintf(":%s\r\n", val)
+		if val, ok := res.(int); ok {
+			s = fmt.Sprintf(":%d\r\n", val)
 		} else {
 			err = errors.New("Encoding failed")
 		}
