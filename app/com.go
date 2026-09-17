@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 )
 
@@ -141,7 +142,7 @@ func (com *Com) ValidateSet(args []string) error {
 func (com *Com) ValidateRPush(args []string) error {
 	// key
 	if len(args) >= 1 {
-		com.Args["listkey"] = []string{args[0]}
+		com.Args["key"] = []string{args[0]}
 	} else {
 		return errors.New("RPush expects key to be passed as an argument")
 	}
@@ -157,7 +158,7 @@ func (com *Com) ValidateRPush(args []string) error {
 
 func (com *Com) ValidateLRange(args []string) error {
 	if len(args) >= 1 {
-		com.Args["listkey"] = []string{args[0]}
+		com.Args["key"] = []string{args[0]}
 	} else {
 		return errors.New("LRange expects key to be passed as an argument")
 	}
@@ -178,7 +179,7 @@ func (com *Com) ValidateLRange(args []string) error {
 func (com *Com) ValidateLPush(args []string) error {
 	// key
 	if len(args) >= 1 {
-		com.Args["listkey"] = []string{args[0]}
+		com.Args["key"] = []string{args[0]}
 	} else {
 		return errors.New("LPush expects key to be passed as an argument")
 	}
@@ -195,7 +196,7 @@ func (com *Com) ValidateLPush(args []string) error {
 func (com *Com) ValidateLLen(args []string) error {
 	// key
 	if len(args) >= 1 {
-		com.Args["listkey"] = []string{args[0]}
+		com.Args["key"] = []string{args[0]}
 	} else {
 		return errors.New("LLen expects key to be passed as an argument")
 	}
@@ -205,7 +206,7 @@ func (com *Com) ValidateLLen(args []string) error {
 
 func (com *Com) ValidateLPop(args []string) error {
 	if len(args) >= 1 {
-		com.Args["listkey"] = []string{args[0]}
+		com.Args["key"] = []string{args[0]}
 	} else {
 		return errors.New("LPop expects key to be passed as an argument")
 	}
@@ -220,10 +221,13 @@ func (com *Com) ValidateLPop(args []string) error {
 
 func (com *Com) ValidateBLPop(args []string) error {
 	if len(args) >= 1 {
-		com.Args["listkey"] = []string{args[0]}
+		com.Args["key"] = []string{args[0]}
 	} else {
 		return errors.New("BLPop expects key to be passed as an argument")
 	}
+
+	// default value
+	com.Args["timeout"] = []string{strconv.FormatInt(0, 10)}
 	if len(args) >= 2 {
 		com.Args["timeout"] = []string{args[1]}
 	} else {
@@ -248,7 +252,7 @@ func (com *Com) ValidateXAdd(args []string) error {
 	var key string
 	if len(args) >= 1 {
 		key = args[0]
-		com.Args["streamkey"] = []string{key}
+		com.Args["key"] = []string{key}
 	} else {
 		return errors.New("XAdd expects stream key to be passed as an argument")
 	}
@@ -285,7 +289,7 @@ func (com *Com) ValidateXAdd(args []string) error {
 
 func (com *Com) ValidateXRange(args []string) error {
 	if len(args) >= 1 {
-		com.Args["streamkey"] = []string{args[0]}
+		com.Args["key"] = []string{args[0]}
 	} else {
 		return errors.New("XAdd expects stream key to be passed as an argument")
 	}

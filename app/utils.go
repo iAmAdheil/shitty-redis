@@ -3,91 +3,39 @@ package main
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/structures/list"
 )
 
 // # Imp points (@iAmAdheil) -> pls take a look later
 // - arg validation should happen during decoding -> string to int conversions should not happen within my com handlers
 
-// tmporarily created here, I hope :)
-var vars = make(map[string]string)
-var vmu sync.RWMutex = sync.RWMutex{}
-
-// (@iAmAdheil) -> add a similar structure as Stream for lists
-var lists = make(map[string]*[]string)
-var listch = make(map[string][]chan string)
-var lmu sync.RWMutex = sync.RWMutex{}
-
-// dir -> 0 for append
-// dir -> 1 for prepend
-func AddToList(listkey string, val []string, dir int) int {
-	var count int
-
-	lmu.Lock()
-	l, ok := lists[listkey]
-	defer lmu.Unlock()
-
-	if !ok {
-		l = &[]string{} // new list
-		lists[listkey] = l
-	}
-
-	switch dir {
-	// rpush
-	case 0:
-		*l = append(*l, val...)
-	// lpush
-	case 1:
-		slices.Reverse(val)
-		*l = append(val, *l...)
-	}
-	count = len(*l)
-
-	handleListeners(listkey)
-
-	return count
-}
-
-func handleListeners(listkey string) {
-	lch, ok := listch[listkey]
-	if ok && len(lch) > 0 {
-		l, ok := lists[listkey]
-		if !ok {
-			return
+func (e *Structure) handleListeners(lp *list.List) {
+	var pop int
+	for _, ch := range e.Listeners {
+		if lp.LLEN() == 0 {
+			break
 		}
 
-		procs := 0
-		for _, ch := range lch {
-			if len(*l) >= 1 {
-				ch <- (*l)[0]
-				// count no. of chans filled
-				// each time a listener is satisfied -> pop
-				procs++
-				*l = (*l)[1:]
-			} else {
-				break
-			}
-		}
-
-		listch[listkey] = lch[procs:]
+		// pop a single element and inject into channel
+		element := lp.LPOP(1)[0]
+		ch <- element
+		pop++
 	}
+
+	e.Listeners = e.Listeners[pop:]
 }
 
-func popChan(lch []chan string, target chan string) ([]chan string, bool) {
+func (e *Structure) findAndPopCh(target chan string) bool {
 	var (
 		clone    []chan string
 		isExists = false
 	)
 
-	if lch == nil {
-		return nil, false
-	}
-
-	for _, ch := range lch {
+	for _, ch := range e.Listeners {
 		if ch != target {
 			clone = append(clone, ch)
 		} else {
@@ -95,81 +43,9 @@ func popChan(lch []chan string, target chan string) ([]chan string, bool) {
 		}
 	}
 
-	return clone, isExists
-}
+	e.Listeners = clone
 
-func DeleteFromList(listkey string, count, dir int) ([]string, error) {
-	s := []string{}
-
-	lmu.Lock()
-	l, ok := lists[listkey]
-	defer lmu.Unlock()
-
-	if !ok {
-		return []string{}, fmt.Errorf("Key not found")
-	}
-
-	listsize := len(*l)
-	// set max removable elements if count > list size
-	count = min(listsize, count)
-
-	switch dir {
-	// rpop
-	case 0:
-	// lpop
-	case 1:
-		for i := 0; i < count; i++ {
-			s = append(s, (*l)[i])
-		}
-		*l = (*l)[count:]
-	}
-
-	return s, nil
-}
-
-func GetListLen(listkey string) int {
-	lmu.RLock()
-	l, ok := lists[listkey]
-	defer lmu.RUnlock()
-
-	if !ok {
-		return 0
-	}
-
-	return len(*l)
-}
-
-func GetListRange(listkey string, l, r int) []string {
-	res := []string{}
-
-	lmu.RLock()
-	list, ok := lists[listkey]
-	defer lmu.RUnlock()
-
-	if !ok {
-		return res
-	}
-	listsize := len(*list)
-
-	if l < 0 {
-		l = max(0, listsize-(-1*l))
-	}
-	if r < 0 {
-		r = max(0, listsize-(-1*r))
-	}
-
-	// max index for the list
-	rmax := listsize - 1
-
-	if l > r || l > rmax {
-		return res
-	}
-
-	for i := l; i <= min(r, rmax); i++ {
-		res = append(res, (*list)[i])
-	}
-
-	return res
+	return isExists
 }
 
 func SetupExpiry(et string, dur string, key string) error {
@@ -198,7 +74,7 @@ func SetupExpiry(et string, dur string, key string) error {
 func Expire(t time.Duration, key string) {
 	time.Sleep(t)
 
-	vmu.Lock()
-	delete(vars, key)
-	vmu.Unlock()
+	kmu.Lock()
+	delete(keyspace, key)
+	kmu.Unlock()
 }
