@@ -58,16 +58,108 @@ Compare this to the flat `map[string]map[string]string` you'd reach for first: a
 
 ### 3. The listpack node — the payload
 
-This is the exact same byte-packed structure [Lists.md](Lists.md) documents byte-by-byte for quicklist nodes — same header, same tag bytes, same `backlen` trick for walking backward. What's stream-specific is *what* gets packed into it:
+This is the exact same byte-packed structure [Lists.md](Lists.md) documents byte-by-byte for quicklist nodes — same header, same tag bytes, same `backlen` trick for walking backward. A stream entry is not one listpack entry, though — it's a small, fixed-order *group* of listpack entries, one per field, read back to back. What's stream-specific is which fields are in that group, and what gets packed into them.
 
-- **The master entry** (the node's first entry, the one the rax key points at) stores data shared by the whole node in full: its own complete field names and values, the count of entries in the node, and the count of deleted entries in the node.
-- **Every entry after the master** stores only the *difference* from the master:
-  - `ms` and `seq` are stored as a delta from the master ID, not as the full 16-byte ID — usually 1-2 bytes instead of 16.
-  - If an entry has the exact same field names as the master, a `SAMEFIELDS` flag is set and only the values are stored, not the names again.
-  - A flags byte marks whether the entry is deleted (a tombstone — see below).
-  - A back-pointer at the end of each entry (the same `backlen` field from the listpack format) lets Redis walk the node backward, which `XREVRANGE` needs.
+**A node holds two separate size/count pairs — don't conflate them:**
 
-This is why one listpack node is capped at roughly 100 entries by default (`stream-node-max-entries`): every entry after the master is only cheap to store *because* it can point back at a nearby master's full field data. Left uncapped, a node stays efficient; splitting on a size/count cap is what keeps any single node from growing large enough to make an insert (which may still need to shift bytes, per the listpack format) expensive.
+1. **Listpack-level (generic, same as a list's node):** total byte size of the listpack, and the count of raw listpack entries — every tag+data+backlen unit, including flags, ID-parts, field names, and the `lp-count` trailer described below. This lives in the listpack's own header, same as a list's node.
+2. **Stream-level (specific to streams):** how many *logical* stream items (master + deltas, deleted or not) are packed into this node, and how many of those are tombstoned. This is not part of the listpack header — it's data stored as fields inside the master entry's own group, because the master is the one thing the rax key can reach directly. One counts raw byte-level units; the other counts logical entries. They are different numbers, both needed — the first for the `stream-node-max-bytes` check, the second for the `stream-node-max-entries` check and for deciding when a node is worth compacting.
+
+**The master entry's field group** (the node's first logical item, the one the rax key points at) stores, in order:
+
+| Field | Holds |
+|---|---|
+| `item-count` | how many logical stream items (master + deltas) are in this node — a **node-level**, not per-entry, number |
+| `deleted-count` | how many of those items are tombstoned — also node-level |
+| `flags` | the master's *own* delete flag — a master can itself be deleted by `XDEL` while its field names are still needed by later deltas (see Tombstones, below) |
+| `num-fields` | how many fields this item has |
+| `field name`, `value` (repeated `num-fields` times) | the master's complete field data, stored in full |
+| `lp-count` | how many listpack entries this group just used — see "Finding item boundaries," below |
+
+**Every entry after the master** stores only the *difference* from the master, in the same fixed order:
+
+| Field | Holds |
+|---|---|
+| `flags` | delete flag, plus a `SAMEFIELDS` bit — set when this item's field names exactly match the master's |
+| `ms-delta`, `seq-delta` | this item's ID, stored as an offset from the master's ID — usually 1-2 bytes instead of the master's full 16-byte ID |
+| `num-fields`, then `field name`/`value` pairs — **only when `SAMEFIELDS` is not set** | skipped entirely when `SAMEFIELDS` is set |
+| `value` (repeated once per field, in the master's field order) — **only when `SAMEFIELDS` is set** | the field names are implied by the master, so only values need to be written |
+| `lp-count` | same purpose as the master's `lp-count` |
+
+**Finding item boundaries — the `lp-count` trailer:** within one item's group, there's no ambiguity about where one field ends and the next begins, because each field is its own complete listpack entry (tag+data+backlen), so its tag already says exactly how many bytes it occupies — same as any listpack entry in `Lists.md`. The open question is where one *item's whole group* ends and the next item's group begins. That's what `lp-count` answers: it's a trailing integer recording how many listpack entries the group just used, so a forward walk knows where the next item's group starts, and a backward walk (`XREVRANGE`) can land on this trailer via the normal `backlen` walk-back and immediately know how many entries to hop back over to reach the start of this item — without decoding the item forward first.
+
+This layered field-vs-item scheme is why one listpack node is capped at roughly 100 items by default (`stream-node-max-entries`): every item after the master is only cheap to store *because* it can point back at a nearby master's full field data. Left uncapped, a node stays efficient; splitting on a size/count cap is what keeps any single node from growing large enough to make an insert (which may still need to shift bytes, per the listpack format) expensive.
+
+### 3a. The whole hierarchy, worked through one example
+
+Two `XADD` calls, both landing in the same node:
+
+```
+XADD mystream * temp 90    → assigned ID 100-0
+XADD mystream * temp 92    → assigned ID 150-0   (same field name as master → SAMEFIELDS)
+```
+
+**Level 0 — the `Stream` object:**
+
+```
+mystream → Stream {
+    rax:                   → (Level 1, below)
+    length:                2
+    last_id:                150-0
+    max_deleted_entry_id:   0-0
+    entries_added:          2
+    cgroups:                (empty rax — no consumer groups yet)
+}
+```
+
+**Level 1 — the rax:** both entries fit under one node so far, so it has exactly one key:
+
+```
+rax {
+    key 100-0  (16 fixed bytes)  →  pointer to Node A
+}
+```
+
+**Level 2 — Node A, one listpack, one flat byte buffer:**
+
+```
+┌─ Listpack header (generic — same fields a list's node has) ─────────┐
+│ total byte size:  (sum of everything below)                         │
+│ raw entry count:  11   ← every tag+data+backlen unit counted below  │
+└───────────────────────────────────────────────────────────────────┘
+
+┌─ Master group — logical item #1, ID 100-0 (the rax key points here) ┐
+│ [int]    item-count      = 2     ← node-level: logical items in this node │
+│ [int]    deleted-count   = 0     ← node-level: tombstoned items in this node │
+│ [int]    flags           = 0     ← master's own delete flag (0 = alive) │
+│ [int]    num-fields      = 1     ← master has 1 field │
+│ [string] "temp"                  ← master's field name │
+│ [int]    90                      ← master's value for "temp" │
+│ [int]    lp-count        = 6     ← this item used 6 listpack entries │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌─ Delta group — logical item #2, ID 150-0 ────────────────────────────┐
+│ [int] flags      = SAMEFIELDS    ← reuse master's field names        │
+│ [int] ms-delta   = 50            ← 150 - 100                         │
+│ [int] seq-delta  = 0                                                 │
+│ [int] value      = 92            ← for "temp", master's field order  │
+│ [int] lp-count   = 4             ← this item used 4 listpack entries │
+└───────────────────────────────────────────────────────────────────────┘
+
+0xFF   ← end-of-listpack marker (same generic marker as a list's node)
+```
+
+**Level 3 — one field, down to bits.** Take the master's value, `90`:
+
+```
+Bit:     7 6 5 4 3 2 1 0
+Byte 0:  0 1 0 1 1 0 1 0   ← tag byte: bit 7 = 0 → 7-bit uint, value packed in low 7 bits = 90
+Byte 1:  0 0 0 0 0 0 0 1   ← backlen = 1 (this entry was 1 byte)
+```
+
+Every other field in both groups — `item-count`, `flags`, `"temp"`, `ms-delta`, `lp-count` — is encoded the same way: a tag byte (or tag plus extra bytes, for values too large for one byte — see `Lists.md`'s tag table), then data, then `backlen`. No separator character exists anywhere; each field's own tag tells you its length, so the next field always starts right where the previous one's `backlen` ended.
+
+**All four levels in one line:** `mystream` (key) → `Stream` struct → `rax` (ID → node lookup) → Node A's listpack (header, master group, delta group, `0xFF`) → each field inside those groups is one tag+data+backlen unit, the same primitive a list uses for a single element.
 
 ### 4. Tombstones — deletion is lazy
 
