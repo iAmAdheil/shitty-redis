@@ -11,10 +11,14 @@
             "id": "abe679788025a5ab",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "Radix Trees.md",
+                "mode": "preview",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "Radix Trees"
             }
           }
         ]
@@ -186,9 +190,10 @@
   },
   "active": "abe679788025a5ab",
   "lastOpenFiles": [
+    "Keyspace.md",
+    "Radix Trees.md",
     "Streams.md",
     "Concurrency.md",
-    "Keyspace.md",
     "Lists.md",
     "Running tests in Go.md",
     "Bit manipulation Golang.md"
