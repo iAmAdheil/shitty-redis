@@ -39,6 +39,29 @@ func (r *RaxNode) GetSortedKeys() []byte {
 	return keys
 }
 
+func (r *RaxNode) IsEmpty() bool {
+	// if root has no children -> empty stream
+	if len(r.Children) == 0 {
+		return true
+	}
+	return false
+}
+
+func (r *RaxNode) GetMax() *listpack.Listpack {
+	cur := r
+	for {
+		// leaf node
+		if cur.HasValue {
+			return cur.Value
+		}
+
+		keys := cur.GetSortedKeys()
+		maxKey := keys[len(keys)-1]
+
+		cur = cur.Children[maxKey]
+	}
+}
+
 func (r *RaxNode) Insert(id []byte, value *listpack.Listpack) {
 	prev, cur := r, r // track prev & current node
 	// prev to break down node
@@ -112,21 +135,6 @@ func (r *RaxNode) Get(id []byte) *listpack.Listpack {
 		}
 		cur = next
 		id = id[len(cur.Prefix):]
-	}
-}
-
-func (r *RaxNode) GetMax() *listpack.Listpack {
-	cur := r
-	for {
-		// leaf node
-		if cur.HasValue {
-			return cur.Value
-		}
-
-		keys := cur.GetSortedKeys()
-		maxKey := keys[len(keys)-1]
-
-		cur = cur.Children[maxKey]
 	}
 }
 
