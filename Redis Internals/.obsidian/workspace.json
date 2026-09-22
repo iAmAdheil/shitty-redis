@@ -25,12 +25,14 @@
             "id": "2a761379df39d9a1",
             "type": "leaf",
             "state": {
-              "type": "excalidraw",
+              "type": "markdown",
               "state": {
-                "file": "structures.md"
+                "file": "Streams.md",
+                "mode": "preview",
+                "source": false
               },
-              "icon": "excalidraw-icon",
-              "title": "structures"
+              "icon": "lucide-file",
+              "title": "Streams"
             }
           }
         ],
@@ -202,10 +204,10 @@
       "obsidian-excalidraw-plugin:New drawing": false
     }
   },
-  "active": "259d4a43d76a241b",
+  "active": "2a761379df39d9a1",
   "lastOpenFiles": [
-    "Lists.md",
     "structures.md",
+    "Lists.md",
     "Streams.md",
     "Radix Trees.md",
     "Keyspace.md",

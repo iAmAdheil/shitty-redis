@@ -57,7 +57,7 @@ func (lp *Listpack) PushR(item string) error {
 		return errors.New("Listpack is full")
 	}
 
-	entry := getEntry(item)
+	entry := GetEntry(item)
 	eSize := uint32(len(entry))
 
 	rs := MAX_NODE_SIZE - size // remaining listpack size
@@ -88,7 +88,7 @@ func (lp *Listpack) PushL(item string) error {
 		return errors.New("Listpack is full")
 	}
 
-	entry := getEntry(item)
+	entry := GetEntry(item)
 	eSize := uint32(len(entry))
 
 	rs := MAX_NODE_SIZE - size // remaining listpack size
@@ -150,13 +150,13 @@ func (lp *Listpack) Read(offset, m int) (elements []string) {
 		tag := lp.Entries[i]
 		j := i + 1
 		// tagB -> bit count to be read from tag
-		// readB -> bit count to be read after tag, diff usecase
+		// readB -> byte count to be read after tag, diff usecase
 		// for string and int
 		tagB, readB, isInt := decodeTag(tag)
 
 		if isInt {
 			if offset > 0 {
-				i += (1 + readB + 1) // tag + readB + backlen byte
+				i += (1 + readB) + getBacklenByteCount(1+readB) // tag + readB + backlen byte count
 				offset--
 				continue
 			}
@@ -202,7 +202,7 @@ func (lp *Listpack) Read(offset, m int) (elements []string) {
 			byteCount := int(bytesToUint64BE(entry)) // count of total string (value) bytes to be read
 
 			if offset > 0 {
-				i += (1 + readB + byteCount + 1) // tag + readB + string bytes + backlen byte
+				i += (1 + readB + byteCount) + getBacklenByteCount(1+readB+byteCount) // tag + readB + string bytes + backlen byte count
 				offset--
 				continue
 			}
@@ -219,7 +219,8 @@ func (lp *Listpack) Read(offset, m int) (elements []string) {
 		}
 		read++
 		// j's final position -> backlen byte
-		i = j + 1
+		// calculate & add backlen byte count
+		i = j + getBacklenByteCount(j-i)
 	}
 
 	return elements
@@ -243,7 +244,8 @@ func (lp *Listpack) PopL() (string, error) {
 	tagB, readB, isInt := decodeTag(tag)
 
 	if isInt {
-		byteCount = 1 + readB + 1 // tag + bytes + backlen byte
+		byteCount = 1 + readB // tag + bytes
+		byteCount += getBacklenByteCount(byteCount)
 
 		switch tagB {
 		case 7:
@@ -287,7 +289,8 @@ func (lp *Listpack) PopL() (string, error) {
 		fIdx++ // last len byte -> first string byte
 
 		strBCount := int(bytesToUint64BE(entry)) // count of total string (value) bytes to be read
-		byteCount = 1 + readB + strBCount + 1    // tag + len bytes + string bytes + backlen byte
+		byteCount = 1 + readB + strBCount        // tag + len bytes + string bytes
+		byteCount += getBacklenByteCount(byteCount)
 
 		val := []byte{}
 		// read strBCount bytes starting from fIdx

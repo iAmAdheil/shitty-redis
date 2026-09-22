@@ -219,7 +219,7 @@ func TestGetSize_TracksBytesAdded(t *testing.T) {
 	lp := New()
 	before := lp.GetSize()
 
-	entryBytes := getEntry("hello")
+	entryBytes := GetEntry("hello")
 	if err := lp.PushR("hello"); err != nil {
 		t.Fatalf("PushR returned an error: %v", err)
 	}
