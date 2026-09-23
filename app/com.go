@@ -281,8 +281,13 @@ func (com *Com) ValidateXAdd(args []string) error {
 	}
 	com.Args["id"] = []string{id}
 
-	args = args[2:]
-	com.Args["data"] = args
+	if len(args) >= 3 {
+		args = args[2:]
+		com.Args["data"] = args
+	} else {
+		// panic prevention
+		com.Args["data"] = []string{}
+	}
 
 	return nil
 }
