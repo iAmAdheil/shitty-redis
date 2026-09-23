@@ -56,6 +56,9 @@ func (r *RaxNode) GetMax() *listpack.Listpack {
 		}
 
 		keys := cur.GetSortedKeys()
+		if len(keys) == 0 {
+			return nil
+		}
 		maxKey := keys[len(keys)-1]
 
 		cur = cur.Children[maxKey]

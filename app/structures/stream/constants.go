@@ -1,4 +1,0 @@
-package stream
-
-const STREAM_NODE_MAX_ENTRIES = 100
-const STREAM_NODE_MAX_BYTES = 4096

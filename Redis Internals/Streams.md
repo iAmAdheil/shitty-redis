@@ -67,14 +67,14 @@ This is the exact same byte-packed structure [Lists.md](Lists.md) documents byte
 
 **The master entry's field group** (the node's first logical item, the one the rax key points at) stores, in order:
 
-| Field | Holds |
-|---|---|
-| `item-count` | how many logical stream items (master + deltas) are in this node — a **node-level**, not per-entry, number |
-| `deleted-count` | how many of those items are tombstoned — also node-level |
-| `flags` | the master's *own* delete flag — a master can itself be deleted by `XDEL` while its field names are still needed by later deltas (see Tombstones, below) |
-| `num-fields` | how many fields this item has |
-| `field name`, `value` (repeated `num-fields` times) | the master's complete field data, stored in full |
-| `lp-count` | how many listpack entries this group just used — see "Finding item boundaries," below |
+| Field                                               | Holds                                                                                                      |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `item-count`                                        | how many logical stream items (master + deltas) are in this node — a **node-level**, not per-entry, number |
+| `deleted-count`                                     | how many of those items are tombstoned — also node-level                                                   |
+|                                                     |                                                                                                            |
+| `num-fields`                                        | how many fields this item has                                                                              |
+| `field name`, `value` (repeated `num-fields` times) | the master's complete field data, stored in full                                                           |
+| `lp-count`                                          | how many listpack entries this group just used — see "Finding item boundaries," below                      |
 
 **Every entry after the master** stores only the *difference* from the master, in the same fixed order:
 
