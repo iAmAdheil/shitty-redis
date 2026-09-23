@@ -251,7 +251,7 @@ func TestPopL_SingleString(t *testing.T) {
 		t.Fatalf("PushR returned an error: %v", err)
 	}
 
-	got, err := lp.PopL()
+	got, err := lp.PopL(0)
 	if err != nil {
 		t.Fatalf("PopL returned an error: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestPopL_MultipleStrings_FIFOOrder(t *testing.T) {
 	// PopL always removes from the left. Pushed via PushR (append at
 	// tail), so popping must return the items in original order.
 	for _, want := range items {
-		got, err := lp.PopL()
+		got, err := lp.PopL(0)
 		if err != nil {
 			t.Fatalf("PopL() returned an error: %v", err)
 		}
@@ -291,7 +291,7 @@ func TestPopL_Integer_RoundTrip(t *testing.T) {
 		t.Fatalf("PushR returned an error: %v", err)
 	}
 
-	got, err := lp.PopL()
+	got, err := lp.PopL(0)
 	if err != nil {
 		t.Fatalf("PopL returned an error: %v", err)
 	}
@@ -310,7 +310,7 @@ func TestPopL_UpdatesSizeAndCount(t *testing.T) {
 	}
 
 	sizeBefore := lp.GetSize()
-	if _, err := lp.PopL(); err != nil {
+	if _, err := lp.PopL(0); err != nil {
 		t.Fatalf("PopL returned an error: %v", err)
 	}
 
@@ -325,7 +325,7 @@ func TestPopL_UpdatesSizeAndCount(t *testing.T) {
 func TestPopL_EmptyListpack_ReturnsError(t *testing.T) {
 	lp := New()
 
-	if _, err := lp.PopL(); err == nil {
+	if _, err := lp.PopL(0); err == nil {
 		t.Errorf("PopL on an empty listpack must return an error")
 	}
 }
@@ -338,7 +338,7 @@ func TestPopL_ThenPushR_StillReadable(t *testing.T) {
 		}
 	}
 
-	if _, err := lp.PopL(); err != nil {
+	if _, err := lp.PopL(0); err != nil {
 		t.Fatalf("PopL returned an error: %v", err)
 	}
 	if err := lp.PushR("d"); err != nil {
@@ -349,6 +349,46 @@ func TestPopL_ThenPushR_StillReadable(t *testing.T) {
 	want := []string{"b", "c", "d"}
 	if !equal(got, want) {
 		t.Errorf("Read(0,3) after PopL+PushR = %v, want %v", got, want)
+	}
+}
+
+func TestPopL_WithOffset_RemovesTargetElement(t *testing.T) {
+	lp := New()
+	items := []string{"a", "b", "c", "d"}
+	for _, v := range items {
+		if err := lp.PushR(v); err != nil {
+			t.Fatalf("PushR(%q) returned an error: %v", v, err)
+		}
+	}
+
+	got, err := lp.PopL(2)
+	if err != nil {
+		t.Fatalf("PopL(2) returned an error: %v", err)
+	}
+	if got != "c" {
+		t.Errorf("PopL(2) = %q, want %q", got, "c")
+	}
+
+	want := []string{"a", "b", "d"}
+	remaining := lp.Read(0, len(want))
+	if !equal(remaining, want) {
+		t.Errorf("Read(0,%d) after PopL(2) = %v, want %v", len(want), remaining, want)
+	}
+	if count := lp.GetCount(); count != uint16(len(want)) {
+		t.Errorf("GetCount() after PopL(2) = %d, want %d", count, len(want))
+	}
+}
+
+func TestPopL_OffsetOutOfRange_ReturnsError(t *testing.T) {
+	lp := New()
+	for _, v := range []string{"a", "b"} {
+		if err := lp.PushR(v); err != nil {
+			t.Fatalf("PushR(%q) returned an error: %v", v, err)
+		}
+	}
+
+	if _, err := lp.PopL(2); err == nil {
+		t.Errorf("PopL(2) on a 2-entry listpack must return an error, offset is out of range")
 	}
 }
 

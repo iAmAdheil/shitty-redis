@@ -226,9 +226,9 @@ func (lp *Listpack) Read(offset, m int) (elements []string) {
 	return elements
 }
 
-func (lp *Listpack) PopL() (string, error) {
+func (lp *Listpack) PopL(offset int) (string, error) {
 	var (
-		entry     []byte
+		i         int = 0
 		res       string
 		byteCount int
 	)
@@ -236,74 +236,98 @@ func (lp *Listpack) PopL() (string, error) {
 	if lp.GetCount() == 0 {
 		return "", errors.New("Empty Listpack")
 	}
-
-	tag := lp.Entries[0]
-	// tagB -> bit count to be read from tag
-	// readB -> bit count to be read after tag, diff usecase
-	// for string and int
-	tagB, readB, isInt := decodeTag(tag)
-
-	if isInt {
-		byteCount = 1 + readB // tag + bytes
-		byteCount += getBacklenByteCount(byteCount)
-
-		switch tagB {
-		case 7:
-			entry = append(entry, uint8(tag&0x7F))
-		case 5:
-			entry = append(entry, uint8(tag&0x1F))
-		}
-
-		for i := 1; i <= readB; i++ {
-			// 8(7), 16(13), 16, 24, 32, 64
-			entry = append(entry, lp.Entries[i])
-		}
-
-		var val int64
-		switch tagB {
-		case 7:
-			// 7 bit int, no possible -ve ints
-			// convert the 7 bit int to a 64 bit uint (padding)
-			// transform into int64 (no diff, leading bit always 0)
-			val = int64(bytesToUint64BE(entry))
-		default:
-			bitCount := uint(tagB + 8*readB)
-			val = signExtend(entry, bitCount)
-		}
-
-		res = strconv.FormatInt(val, 10)
-
-	} else {
-		switch tagB {
-		case 6:
-			entry = append(entry, uint8(tag&0x3F))
-		case 4:
-			entry = append(entry, uint8(tag&0x0F))
-		}
-
-		var fIdx = 0 // index to start reading string bytes from, start at tag bit
-		for i := 1; i <= readB; i++ {
-			entry = append(entry, lp.Entries[i])
-			fIdx = i
-		}
-		fIdx++ // last len byte -> first string byte
-
-		strBCount := int(bytesToUint64BE(entry)) // count of total string (value) bytes to be read
-		byteCount = 1 + readB + strBCount        // tag + len bytes + string bytes
-		byteCount += getBacklenByteCount(byteCount)
-
-		val := []byte{}
-		// read strBCount bytes starting from fIdx
-		for strBCount != 0 {
-			val = append(val, lp.Entries[fIdx])
-			fIdx++
-			strBCount--
-		}
-
-		res = string(val)
+	if lp.GetCount() <= uint16(offset) {
+		return "", errors.New("Invalid offset")
 	}
 
-	lp.Entries = lp.Entries[byteCount:]
+	for offset >= 0 {
+		// hold current entry
+		entry := []byte{}
+
+		tag := lp.Entries[i]
+		// tagB -> bit count to be read from tag
+		// readB -> bit count to be read after tag, diff usecase
+		// for string and int
+		tagB, readB, isInt := decodeTag(tag)
+
+		if isInt {
+			byteCount = 1 + readB // tag + bytes
+			byteCount += getBacklenByteCount(byteCount)
+
+			// skip entry
+			if offset > 0 {
+				i += byteCount
+				offset--
+				continue
+			}
+
+			switch tagB {
+			case 7:
+				entry = append(entry, uint8(tag&0x7F))
+			case 5:
+				entry = append(entry, uint8(tag&0x1F))
+			}
+
+			for j := 1; j <= readB; j++ {
+				// 8(7), 16(13), 16, 24, 32, 64
+				entry = append(entry, lp.Entries[i+j])
+			}
+
+			var val int64
+			switch tagB {
+			case 7:
+				// 7 bit int, no possible -ve ints
+				// convert the 7 bit int to a 64 bit uint (padding)
+				// transform into int64 (no diff, leading bit always 0)
+				val = int64(bytesToUint64BE(entry))
+			default:
+				bitCount := uint(tagB + 8*readB)
+				val = signExtend(entry, bitCount)
+			}
+
+			res = strconv.FormatInt(val, 10)
+			offset--
+
+		} else {
+			switch tagB {
+			case 6:
+				entry = append(entry, uint8(tag&0x3F))
+			case 4:
+				entry = append(entry, uint8(tag&0x0F))
+			}
+
+			var fIdx = i // index to start reading string bytes from, start at tag bit
+			for j := 1; j <= readB; j++ {
+				entry = append(entry, lp.Entries[i+j])
+				fIdx = i + j
+			}
+			fIdx++ // last len byte -> first string byte
+
+			strBCount := int(bytesToUint64BE(entry)) // count of total string (value) bytes to be read
+			byteCount = 1 + readB + strBCount        // tag + len bytes + string bytes
+			byteCount += getBacklenByteCount(byteCount)
+
+			// skip entry
+			if offset > 0 {
+				i += byteCount
+				offset--
+				continue
+			}
+
+			val := []byte{}
+			// read strBCount bytes starting from fIdx
+			for strBCount != 0 {
+				val = append(val, lp.Entries[fIdx])
+				fIdx++
+				strBCount--
+			}
+
+			res = string(val)
+			offset--
+		}
+	}
+
+	lp.Entries = append(lp.Entries[0:i], lp.Entries[i+byteCount:]...)
 	lp.UpdateCount(-1)
 	// remove bytecount bytes from listpack
 	lp.UpdateSize(byteCount * -1)
