@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/structures/list"
+	"github.com/codecrafters-io/redis-starter-go/app/structures/stream"
 )
 
 func (com *Com) ping() []byte {
@@ -311,33 +311,24 @@ func (com *Com) blpop() []byte {
 }
 
 func (com *Com) xadd() []byte {
-	streamkey := com.Args["streamkey"][0]
+	key := com.Args["key"][0]
 	id := com.Args["id"][0]
 	data := com.Args["data"]
 
-	// inner object
-	obj := make(map[string]string)
-
-	for i := 0; i < len(data); i++ {
-		obj[data[i]] = data[i+1]
-		i++
-	}
-
-	stream, ok := streams[streamkey]
+	kmu.RLock()
+	e, ok := keyspace[key]
+	// DNE
 	if !ok {
-		ns := make(map[string]map[string]string)
-		ns[id] = obj
-		streams[streamkey] = &Stream{
-			mu:      &sync.RWMutex{},
-			entries: &ns,
-		}
-	} else {
-		stream.mu.Lock()
-		// add {id: {key: value}} to the entries in Stream
-		entries := (*stream).entries
-		(*entries)[id] = obj
-		stream.mu.Unlock()
+		e = NewStructure(TypeStream, stream.New())
+		keyspace[key] = e
 	}
+
+	st, ok := e.Data.(*stream.Stream)
+	if e.Type != TypeStream || !ok {
+		// do something
+	}
+
+	st.XADD(data, id)
 
 	return RESPEncoder(id, Bulk)
 }

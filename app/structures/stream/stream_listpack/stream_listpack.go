@@ -19,7 +19,7 @@ type StreamListpack struct {
 }
 
 // new stream lp is created only when inserting a new stream entry
-func NewStreamLP(data []string, ms, seq uint64) *StreamListpack {
+func New(data []string, ms, seq uint64) *StreamListpack {
 	fields := []string{}
 	for i := 0; i < len(data); i = i + 2 {
 		fields = append(fields, data[i])
@@ -35,6 +35,7 @@ func NewStreamLP(data []string, ms, seq uint64) *StreamListpack {
 
 		lp: listpack.New(),
 	}
+	s.Push(data, ms, seq)
 
 	return s
 }
@@ -83,6 +84,7 @@ func (s *StreamListpack) Push(data []string, ms, seq uint64) error {
 		return errors.New("Stream Listpack is full")
 	}
 
+	s.Count++
 	s.lp.Entries = append(s.lp.Entries, entry...)
 
 	return nil

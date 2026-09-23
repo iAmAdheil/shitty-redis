@@ -4,19 +4,19 @@ import (
 	"bytes"
 	"slices"
 
-	"github.com/codecrafters-io/redis-starter-go/app/structures/listpack"
+	streamlistpack "github.com/codecrafters-io/redis-starter-go/app/structures/stream/stream_listpack"
 )
 
 // fixed len keys -> 16 bytes -> leaf nodes --> hasValue: true
 
 type RaxNode struct {
 	Prefix   []byte
-	Value    *listpack.Listpack
+	Value    *streamlistpack.StreamListpack
 	HasValue bool
 	Children map[byte]*RaxNode
 }
 
-func New(prefix []byte, value *listpack.Listpack) *RaxNode {
+func New(prefix []byte, value *streamlistpack.StreamListpack) *RaxNode {
 	var hasVal bool
 	if value != nil {
 		hasVal = true
@@ -47,7 +47,7 @@ func (r *RaxNode) IsEmpty() bool {
 	return false
 }
 
-func (r *RaxNode) GetMax() *listpack.Listpack {
+func (r *RaxNode) GetMax() *streamlistpack.StreamListpack {
 	cur := r
 	for {
 		// leaf node
@@ -65,7 +65,7 @@ func (r *RaxNode) GetMax() *listpack.Listpack {
 	}
 }
 
-func (r *RaxNode) Insert(id []byte, value *listpack.Listpack) {
+func (r *RaxNode) Insert(id []byte, value *streamlistpack.StreamListpack) {
 	prev, cur := r, r // track prev & current node
 	// prev to break down node
 
@@ -115,7 +115,7 @@ func (r *RaxNode) Insert(id []byte, value *listpack.Listpack) {
 }
 
 // answers -> is given id the starting entry for a listpack
-func (r *RaxNode) Get(id []byte) *listpack.Listpack {
+func (r *RaxNode) Get(id []byte) *streamlistpack.StreamListpack {
 	cur := r
 
 	for {
@@ -141,7 +141,7 @@ func (r *RaxNode) Get(id []byte) *listpack.Listpack {
 	}
 }
 
-func (r *RaxNode) Find(id []byte) (res *listpack.Listpack) {
+func (r *RaxNode) Find(id []byte) (res *streamlistpack.StreamListpack) {
 	fb := id[0]
 	var next *RaxNode
 

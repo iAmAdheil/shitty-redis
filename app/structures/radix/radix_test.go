@@ -3,7 +3,7 @@ package radix
 import (
 	"testing"
 
-	"github.com/codecrafters-io/redis-starter-go/app/structures/listpack"
+	streamlistpack "github.com/codecrafters-io/redis-starter-go/app/structures/stream/stream_listpack"
 )
 
 func TestNew_InitialState(t *testing.T) {
@@ -19,7 +19,7 @@ func TestNew_InitialState(t *testing.T) {
 
 func TestInsert_SingleKey(t *testing.T) {
 	r := New(nil, nil)
-	lp := listpack.New()
+	lp := streamlistpack.New([]string{"field", "value"}, 0, 0)
 
 	r.Insert([]byte("car"), lp)
 
@@ -38,8 +38,8 @@ func TestInsert_SingleKey(t *testing.T) {
 func TestInsert_DivergingKeys_Split(t *testing.T) {
 	// "car" then "cat" share "ca" and diverge at the third byte.
 	r := New(nil, nil)
-	lpCar := listpack.New()
-	lpCat := listpack.New()
+	lpCar := streamlistpack.New([]string{"field", "value"}, 0, 0)
+	lpCat := streamlistpack.New([]string{"field", "value"}, 0, 0)
 
 	r.Insert([]byte("car"), lpCar)
 	r.Insert([]byte("cat"), lpCat)
@@ -76,8 +76,8 @@ func TestInsert_ShorterKeyIsPrefixOfExisting(t *testing.T) {
 	// "care" is inserted first, then "car" — a strict prefix of it.
 	// The existing node's leftover suffix ("e") must survive the split.
 	r := New(nil, nil)
-	lpCare := listpack.New()
-	lpCar := listpack.New()
+	lpCare := streamlistpack.New([]string{"field", "value"}, 0, 0)
+	lpCar := streamlistpack.New([]string{"field", "value"}, 0, 0)
 
 	r.Insert([]byte("care"), lpCare)
 	r.Insert([]byte("car"), lpCar)
@@ -107,8 +107,8 @@ func TestInsert_ShorterKeyIsPrefixOfExisting(t *testing.T) {
 
 func TestInsert_ExactDuplicateUpdatesValueInPlace(t *testing.T) {
 	r := New(nil, nil)
-	lpOld := listpack.New()
-	lpNew := listpack.New()
+	lpOld := streamlistpack.New([]string{"field", "value"}, 0, 0)
+	lpNew := streamlistpack.New([]string{"field", "value"}, 0, 0)
 
 	r.Insert([]byte("car"), lpOld)
 	r.Insert([]byte("car"), lpNew)
@@ -126,10 +126,10 @@ func TestInsert_ExactDuplicateUpdatesValueInPlace(t *testing.T) {
 func TestInsert_FourKeys_MatchesWorkedExample(t *testing.T) {
 	// Mirrors the walkthrough in Redis Internals/Radix Trees.md, section 6.
 	r := New(nil, nil)
-	lpCar := listpack.New()
-	lpCat := listpack.New()
-	lpDog := listpack.New()
-	lpCare := listpack.New()
+	lpCar := streamlistpack.New([]string{"field", "value"}, 0, 0)
+	lpCat := streamlistpack.New([]string{"field", "value"}, 0, 0)
+	lpDog := streamlistpack.New([]string{"field", "value"}, 0, 0)
+	lpCare := streamlistpack.New([]string{"field", "value"}, 0, 0)
 
 	r.Insert([]byte("car"), lpCar)
 	r.Insert([]byte("cat"), lpCat)
