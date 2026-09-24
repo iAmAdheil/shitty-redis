@@ -47,6 +47,7 @@ func (r *RaxNode) IsEmpty() bool {
 	return false
 }
 
+// max possible raxnode (id) reachable from a given raxnode
 func (r *RaxNode) GetMax() *streamlistpack.StreamListpack {
 	cur := r
 	for {
@@ -60,6 +61,25 @@ func (r *RaxNode) GetMax() *streamlistpack.StreamListpack {
 			return nil
 		}
 		maxKey := keys[len(keys)-1]
+
+		cur = cur.Children[maxKey]
+	}
+}
+
+// min possible raxnode (id) reachable from a given raxnode
+func (r *RaxNode) GetMin() *streamlistpack.StreamListpack {
+	cur := r
+	for {
+		// leaf node
+		if cur.HasValue {
+			return cur.Value
+		}
+
+		keys := cur.GetSortedKeys()
+		if len(keys) == 0 {
+			return nil
+		}
+		maxKey := keys[0]
 
 		cur = cur.Children[maxKey]
 	}
@@ -141,8 +161,9 @@ func (r *RaxNode) Get(id []byte) *streamlistpack.StreamListpack {
 	}
 }
 
-// find appropriate stream listpack
-func (r *RaxNode) Find(id []byte) (res *streamlistpack.StreamListpack) {
+// find appropriate raxnode -> streamlistpack that could hold id
+// greatest rax <= id
+func (r *RaxNode) FindPredRax(id []byte) (res *streamlistpack.StreamListpack) {
 	fb := id[0]
 	var next *RaxNode
 
@@ -160,7 +181,7 @@ func (r *RaxNode) Find(id []byte) (res *streamlistpack.StreamListpack) {
 			if prefLen == len(id) {
 				return next.Value
 			}
-			b := next.Find(slices.Clone(id[prefLen:]))
+			b := next.FindPredRax(slices.Clone(id[prefLen:]))
 			if b != nil {
 				return b
 			}
@@ -176,4 +197,41 @@ func (r *RaxNode) Find(id []byte) (res *streamlistpack.StreamListpack) {
 	}
 	next = r.Children[p]
 	return next.GetMax()
+}
+
+// smallest rax >= id
+func (r *RaxNode) FindSucRax(id []byte) (res *streamlistpack.StreamListpack) {
+	fb := id[0]
+	var next *RaxNode
+
+	// go to predecessor if:
+	//  - key does not exist
+	// 	- prefix for key's node is greater than id
+	next = r.Children[fb]
+	if next != nil {
+		prefLen := len(next.Prefix)
+		// r == 0 -> recurse downwards
+		// r == 0 && len(next.Prefix) == len(id) -> return value -> exact match
+		// r == -1 -> get max
+		r := bytes.Compare(next.Prefix, id[:prefLen])
+		if r == 0 {
+			if prefLen == len(id) {
+				return next.Value
+			}
+			b := next.FindSucRax(slices.Clone(id[prefLen:]))
+			if b != nil {
+				return b
+			}
+		} else if r == 1 {
+			return next.GetMin()
+		}
+		// else find a successor, at lowest level possible and return
+	}
+	keys := r.GetSortedKeys()
+	p, err := Successor(keys, fb)
+	if err != nil {
+		return nil
+	}
+	next = r.Children[p]
+	return next.GetMin()
 }

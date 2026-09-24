@@ -351,3 +351,23 @@ func (com *Com) xadd() ([]byte, error) {
 
 	return RESPEncoder(id, Bulk), nil
 }
+
+// func (com *Com) xrange() ([]byte, error) {
+// 	key := com.Args["key"][0]
+// 	low := com.Args["low"][0]
+// 	high := com.Args["high"][0]
+
+// 	kmu.RLock()
+// 	defer kmu.RUnlock()
+// 	e, ok := keyspace[key]
+// 	// DNE
+// 	if !ok {
+// 		e = NewStructure(TypeStream, stream.New())
+// 		keyspace[key] = e
+// 	}
+
+// 	st, ok := e.Data.(*stream.Stream)
+// 	if e.Type != TypeStream || !ok {
+// 		return nil, errors.New("A non-stream element with the given key already exists")
+// 	}
+// }

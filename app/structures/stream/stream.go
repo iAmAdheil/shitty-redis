@@ -57,3 +57,7 @@ func (st *Stream) XADD(data []string, idS string) {
 	lp = streamlistpack.New(data, ms, seq)
 	st.Rax.Insert(idB, lp)
 }
+
+func (st *Stream) XRANGE(low, high string) {
+	low, high = formatXRANGEIds(low, high)
+}

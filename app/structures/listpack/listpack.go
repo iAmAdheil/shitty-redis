@@ -136,6 +136,7 @@ func decodeTag(tag byte) (int, int, bool) {
 	}
 }
 
+// (@iAmAdheil) -> add support for backward reads (reads from the end) in the future
 // max entries to be read from the listpack
 // read all if m greater than elements in node
 // read -> count of no. of elements read

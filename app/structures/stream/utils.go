@@ -3,6 +3,7 @@ package stream
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -75,4 +76,19 @@ func (st *Stream) GenerateStreamEntryId(id string) (string, error) {
 	default:
 		return "", nil
 	}
+}
+
+// handle ms only -> append seq
+func formatXRANGEIds(low, high string) (string, string) {
+	pLow := strings.Split(low, "-")
+	pHigh := strings.Split(high, "-")
+
+	if len(pLow) == 1 {
+		low += "-0"
+	}
+	if len(pHigh) == 1 {
+		high += fmt.Sprintf("-%d", uint64(math.MaxUint64))
+	}
+
+	return low, high
 }
