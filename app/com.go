@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"strconv"
-	"strings"
 )
 
 // #D1 -> using []string as arg value for now. If it does not work out, go for any in the future
@@ -57,7 +56,7 @@ func GetCom(base string, args []string) (*Com, error) {
 	return com, err
 }
 
-func (com *Com) HandleCom() []byte {
+func (com *Com) HandleCom() ([]byte, error) {
 	switch com.Base {
 	case "ping":
 		return com.ping()
@@ -83,11 +82,11 @@ func (com *Com) HandleCom() []byte {
 		return com.handleType()
 	case "xadd":
 		return com.xadd()
-	case "xrange":
-		return com.xrange()
+	// case "xrange":
+	// 	return com.xrange()
 
 	default:
-		return nil
+		return nil, nil
 	}
 }
 
@@ -257,29 +256,11 @@ func (com *Com) ValidateXAdd(args []string) error {
 		return errors.New("XAdd expects stream key to be passed as an argument")
 	}
 
-	var id string
 	if len(args) >= 2 {
-		id = args[1]
-		// check for * in id
-		p := strings.Split(id, "-")
-		if p[0] == "*" || p[1] == "*" {
-			// if either part is *, generate id
-			gid, err := generateStreamEntryId(key, id)
-			if err != nil {
-				return err
-			}
-
-			id = gid
-		} else {
-			// if no *, use validate and use the same
-			if err := validateStreamEntryId(key, id); err != nil {
-				return err
-			}
-		}
+		com.Args["id"] = []string{args[1]}
 	} else {
 		return errors.New("XAdd expects id to be passed as an argument")
 	}
-	com.Args["id"] = []string{id}
 
 	if len(args) >= 3 {
 		args = args[2:]

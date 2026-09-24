@@ -141,6 +141,7 @@ func (r *RaxNode) Get(id []byte) *streamlistpack.StreamListpack {
 	}
 }
 
+// find appropriate stream listpack
 func (r *RaxNode) Find(id []byte) (res *streamlistpack.StreamListpack) {
 	fb := id[0]
 	var next *RaxNode
@@ -166,6 +167,7 @@ func (r *RaxNode) Find(id []byte) (res *streamlistpack.StreamListpack) {
 		} else if r == -1 {
 			return next.GetMax()
 		}
+		// else find a predecessor, at lowest level possible and return
 	}
 	keys := r.GetSortedKeys()
 	p, err := Predecessor(keys, fb)

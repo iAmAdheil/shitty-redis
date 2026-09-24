@@ -1,23 +1,25 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/structures/list"
 	"github.com/codecrafters-io/redis-starter-go/app/structures/stream"
 )
 
-func (com *Com) ping() []byte {
-	return RESPEncoder("PONG", Simple)
+func (com *Com) ping() ([]byte, error) {
+	return RESPEncoder("PONG", Simple), nil
 }
 
-func (com *Com) echo() []byte {
-	return RESPEncoder(com.Args["echothis"][0], Bulk)
+func (com *Com) echo() ([]byte, error) {
+	return RESPEncoder(com.Args["echothis"][0], Bulk), nil
 }
 
-func (com *Com) handleType() []byte {
+func (com *Com) handleType() ([]byte, error) {
 	key := com.Args["key"][0]
 
 	kmu.RLock()
@@ -27,18 +29,18 @@ func (com *Com) handleType() []byte {
 	if ok {
 		switch e.Type {
 		case TypeVar:
-			return RESPEncoder("string", Simple)
+			return RESPEncoder("string", Simple), nil
 		case TypeList:
-			return RESPEncoder("list", Simple)
+			return RESPEncoder("list", Simple), nil
 		case TypeStream:
-			return RESPEncoder("stream", Simple)
+			return RESPEncoder("stream", Simple), nil
 		}
 	}
 
-	return RESPEncoder("none", Simple)
+	return RESPEncoder("none", Simple), nil
 }
 
-func (com *Com) get() []byte {
+func (com *Com) get() ([]byte, error) {
 	key := com.Args["key"][0]
 
 	kmu.RLock()
@@ -47,7 +49,7 @@ func (com *Com) get() []byte {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		return RESPEncoder(nil, NullBulk)
+		return RESPEncoder(nil, NullBulk), nil
 	}
 
 	v, ok := e.Data.(*string)
@@ -55,10 +57,10 @@ func (com *Com) get() []byte {
 		// do something
 	}
 
-	return RESPEncoder(*v, Bulk)
+	return RESPEncoder(*v, Bulk), nil
 }
 
-func (com *Com) set() []byte {
+func (com *Com) set() ([]byte, error) {
 	key := com.Args["key"][0]
 	val := com.Args["value"][0]
 
@@ -76,10 +78,10 @@ func (com *Com) set() []byte {
 		}
 	}
 
-	return RESPEncoder("OK", Simple)
+	return RESPEncoder("OK", Simple), nil
 }
 
-func (com *Com) rpush() []byte {
+func (com *Com) rpush() ([]byte, error) {
 	key := com.Args["key"][0]
 	values := com.Args["values"] // array of values
 
@@ -102,10 +104,10 @@ func (com *Com) rpush() []byte {
 
 	e.handleListeners(lp)
 
-	return RESPEncoder(lp.LLEN(), Int)
+	return RESPEncoder(lp.LLEN(), Int), nil
 }
 
-func (com *Com) lrange() []byte {
+func (com *Com) lrange() ([]byte, error) {
 	key := com.Args["key"][0]
 	ls := com.Args["left"][0]
 	rs := com.Args["right"][0]
@@ -127,7 +129,7 @@ func (com *Com) lrange() []byte {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		return RESPEncoder(elements, BulkList)
+		return RESPEncoder(elements, BulkList), nil
 	}
 
 	lp, ok := e.Data.(*list.List)
@@ -137,10 +139,10 @@ func (com *Com) lrange() []byte {
 
 	elements = lp.LRANGE(l, r)
 
-	return RESPEncoder(elements, BulkList)
+	return RESPEncoder(elements, BulkList), nil
 }
 
-func (com *Com) lpush() []byte {
+func (com *Com) lpush() ([]byte, error) {
 	key := com.Args["key"][0]
 	values := com.Args["values"] // array of values
 
@@ -163,10 +165,10 @@ func (com *Com) lpush() []byte {
 
 	e.handleListeners(lp)
 
-	return RESPEncoder(lp.LLEN(), Int)
+	return RESPEncoder(lp.LLEN(), Int), nil
 }
 
-func (com *Com) llen() []byte {
+func (com *Com) llen() ([]byte, error) {
 	key := com.Args["key"][0]
 
 	kmu.RLock()
@@ -175,7 +177,7 @@ func (com *Com) llen() []byte {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		return RESPEncoder(0, Int)
+		return RESPEncoder(0, Int), nil
 	}
 
 	lp, ok := e.Data.(*list.List)
@@ -183,10 +185,10 @@ func (com *Com) llen() []byte {
 		// do something
 	}
 
-	return RESPEncoder(lp.LLEN(), Int)
+	return RESPEncoder(lp.LLEN(), Int), nil
 }
 
-func (com *Com) lpop() []byte {
+func (com *Com) lpop() ([]byte, error) {
 	key := com.Args["key"][0]
 	c, err := strconv.Atoi(com.Args["count"][0])
 	if err != nil {
@@ -201,7 +203,7 @@ func (com *Com) lpop() []byte {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		return RESPEncoder(nil, NullBulk)
+		return RESPEncoder(nil, NullBulk), nil
 	}
 
 	lp, ok := e.Data.(*list.List)
@@ -217,16 +219,16 @@ func (com *Com) lpop() []byte {
 	}
 
 	if len(out) == 0 {
-		return RESPEncoder(nil, NullBulk)
+		return RESPEncoder(nil, NullBulk), nil
 	} else if len(out) > 1 {
 		// bulk list
-		return RESPEncoder(out, BulkList)
+		return RESPEncoder(out, BulkList), nil
 	}
 	// len = 1 -> single element popped -> bulk string
-	return RESPEncoder(out[0], Bulk)
+	return RESPEncoder(out[0], Bulk), nil
 }
 
-func (com *Com) blpop() []byte {
+func (com *Com) blpop() ([]byte, error) {
 	key := com.Args["key"][0]
 	timeout, _ := strconv.ParseFloat(com.Args["timeout"][0], 32)
 
@@ -267,7 +269,7 @@ func (com *Com) blpop() []byte {
 	kmu.Unlock()
 	// unlock and exit
 	if res != nil {
-		return res
+		return res, nil
 	}
 
 	var expch <-chan time.Time
@@ -307,15 +309,16 @@ func (com *Com) blpop() []byte {
 		}
 	}
 
-	return res
+	return res, nil
 }
 
-func (com *Com) xadd() []byte {
+func (com *Com) xadd() ([]byte, error) {
 	key := com.Args["key"][0]
 	id := com.Args["id"][0]
 	data := com.Args["data"]
 
-	kmu.RLock()
+	kmu.Lock()
+	defer kmu.Unlock()
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
@@ -325,28 +328,26 @@ func (com *Com) xadd() []byte {
 
 	st, ok := e.Data.(*stream.Stream)
 	if e.Type != TypeStream || !ok {
-		// do something
+		return nil, errors.New("A non-stream element with the given key already exists")
 	}
 
+	// check for * in id
+	p := strings.Split(id, "-")
+	if p[0] == "*" || p[1] == "*" {
+		// if either part is *, generate id
+		gid, err := st.GenerateStreamEntryId(id) // completed/generated id
+		if err != nil {
+			return nil, err
+		}
+
+		id = gid
+	} else {
+		// if no *, use validate and use the same
+		if err := st.ValidateStreamEntryId(id); err != nil {
+			return nil, err
+		}
+	}
 	st.XADD(data, id)
 
-	return RESPEncoder(id, Bulk)
-}
-
-func (com *Com) xrange() []byte {
-	key := com.Args["streamkey"][0]
-	low := com.Args["low"][0]
-	high := com.Args["high"][0]
-
-	smu.RLock()
-	stream, _ := streams[key]
-	smu.RUnlock()
-
-	// getEntriesInMilRange -> handles its own stream locking
-	entries, err := stream.getEntriesInRange(low, high)
-	if err != nil {
-		// do something
-	}
-
-	return RESPEncoder(entries, Array)
+	return RESPEncoder(id, Bulk), nil
 }

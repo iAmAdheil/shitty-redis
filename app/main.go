@@ -45,7 +45,10 @@ func HandleConn(conn net.Conn) {
 		if err != nil {
 			out = RESPEncoder(err.Error(), SimpleErr)
 		} else {
-			out = com.HandleCom()
+			out, err = com.HandleCom()
+			if err != nil {
+				out = RESPEncoder(err.Error(), SimpleErr)
+			}
 		}
 
 		// log sent over request

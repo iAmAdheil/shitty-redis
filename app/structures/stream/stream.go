@@ -33,7 +33,7 @@ func New() *Stream {
 
 func (st *Stream) XADD(data []string, idS string) {
 	var lp *streamlistpack.StreamListpack
-	ms, seq := splitId(idS)
+	ms, seq, _ := splitId(idS) // validated Id, can ignore error here
 	id := &Id{
 		ms:  ms,
 		seq: seq,

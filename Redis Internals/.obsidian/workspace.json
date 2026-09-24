@@ -28,7 +28,7 @@
               "type": "markdown",
               "state": {
                 "file": "Streams.md",
-                "mode": "preview",
+                "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
@@ -207,8 +207,8 @@
   "active": "2a761379df39d9a1",
   "lastOpenFiles": [
     "structures.md",
-    "Lists.md",
     "Streams.md",
+    "Lists.md",
     "Radix Trees.md",
     "Keyspace.md",
     "Concurrency.md",
