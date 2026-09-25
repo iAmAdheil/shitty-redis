@@ -17,10 +17,14 @@ type Listpack struct {
 
 func New() *Listpack {
 	s := [4]byte{}
+	c := [2]byte{}
+
 	binary.BigEndian.PutUint32(s[:], 7)
+	binary.BigEndian.PutUint16(c[:], 0)
 
 	return &Listpack{
 		size:    s,
+		count:   c,
 		Entries: []byte{0xFF},
 	}
 }

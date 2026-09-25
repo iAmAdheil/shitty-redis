@@ -82,8 +82,8 @@ func (com *Com) HandleCom() ([]byte, error) {
 		return com.handleType()
 	case "xadd":
 		return com.xadd()
-	// case "xrange":
-	// 	return com.xrange()
+	case "xrange":
+		return com.xrange()
 
 	default:
 		return nil, nil

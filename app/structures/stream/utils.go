@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func splitId(id string) (uint64, uint64, error) {
@@ -30,14 +31,14 @@ func (st *Stream) ValidateStreamEntryId(id string) error {
 		return err
 	}
 
+	if ms == 0 && seq == 0 {
+		return errors.New("The ID specified in XADD must be greater than 0-0")
+	}
+
 	if st != nil && st.LastId != nil {
 		msEnd, seqEnd := st.LastId.ms, st.LastId.seq
 		if ms < msEnd || (ms == msEnd && seq <= seqEnd) {
-			return errors.New("Invalid id")
-		}
-	} else {
-		if ms == 0 && seq == 0 {
-			return errors.New("Invalid id")
+			return errors.New("The ID specified in XADD is equal or smaller than the target stream top item")
 		}
 	}
 
@@ -48,15 +49,27 @@ func (st *Stream) GenerateStreamEntryId(id string) (string, error) {
 	p := strings.Split(id, "-")
 	switch "*" {
 	case p[0]:
+		ms := uint64(time.Now().UnixMilli())
 		if st == nil || st.LastId == nil {
-			return FIRST_STREAM_ID, nil
-		} else {
-			ms, seq := st.LastId.ms, st.LastId.seq
-			return fmt.Sprintf("%d-%d", ms, seq+1), nil
+			return fmt.Sprintf("%d-0", ms), nil
 		}
+		lastMs, lastSeq := st.LastId.ms, st.LastId.seq
+		if ms > lastMs {
+			return fmt.Sprintf("%d-0", ms), nil
+		}
+		// clock hasn't advanced past the last entry's ms: stay monotonic
+		return fmt.Sprintf("%d-%d", lastMs, lastSeq+1), nil
 	case p[1]:
 		if st == nil || st.LastId == nil {
-			return fmt.Sprintf("%s-0", p[0]), nil
+			msId, err := strconv.ParseUint(p[0], 10, 64)
+			if err != nil {
+				return "", errors.New("Invalid id")
+			}
+			seq := uint64(0)
+			if msId == 0 {
+				seq = 1 // 0-0 is a reserved id
+			}
+			return fmt.Sprintf("%d-%d", msId, seq), nil
 		} else {
 			ms, seq := st.LastId.ms, st.LastId.seq
 

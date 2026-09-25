@@ -1,6 +1,10 @@
 package stream
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+	"time"
+)
 
 // safeValidate calls ValidateStreamEntryId and converts a panic into a
 // reported flag instead of crashing the whole test binary. st != nil does
@@ -131,34 +135,55 @@ func TestValidateStreamEntryId_MalformedId_ReturnsErrorNotPanic(t *testing.T) {
 	}
 }
 
-func TestGenerateStreamEntryId_FreshStream_FullyAuto_ReturnsFirstStreamId(t *testing.T) {
+func TestGenerateStreamEntryId_FreshStream_FullyAuto_UsesCurrentTimestamp(t *testing.T) {
 	st := New()
 
+	before := time.Now().UnixMilli()
 	id, err, panicked := safeGenerate(t, st, "*")
+	after := time.Now().UnixMilli()
 	if panicked {
-		t.Fatalf("GenerateStreamEntryId(%q) on a fresh stream panicked, want %q", "*", FIRST_STREAM_ID)
+		t.Fatalf("GenerateStreamEntryId(%q) on a fresh stream panicked", "*")
 	}
 	if err != nil {
 		t.Fatalf("GenerateStreamEntryId(%q) error = %v, want nil", "*", err)
 	}
-	if id != FIRST_STREAM_ID {
-		t.Errorf("GenerateStreamEntryId(%q) = %q, want %q", "*", id, FIRST_STREAM_ID)
+
+	ms, seq, err := splitId(id)
+	if err != nil {
+		t.Fatalf("GenerateStreamEntryId(%q) = %q, not a valid id: %v", "*", id, err)
+	}
+	if int64(ms) < before || int64(ms) > after {
+		t.Errorf("GenerateStreamEntryId(%q) ms = %d, want between %d and %d (the current Unix ms timestamp)", "*", ms, before, after)
+	}
+	if seq != 0 {
+		t.Errorf("GenerateStreamEntryId(%q) seq = %d, want 0: first entry at this ms", "*", seq)
 	}
 }
 
-func TestGenerateStreamEntryId_ExistingStream_FullyAuto_IncrementsSeq(t *testing.T) {
+func TestGenerateStreamEntryId_ExistingStream_FullyAuto_SameMsIncrementsSeq(t *testing.T) {
 	st := New()
-	st.XADD([]string{"field", "value"}, "5-5")
+	now := uint64(time.Now().UnixMilli())
+	st.XADD([]string{"field", "value"}, fmt.Sprintf("%d-5", now))
 
 	id, err, panicked := safeGenerate(t, st, "*")
 	if panicked {
-		t.Fatalf("GenerateStreamEntryId(%q) panicked, want %q", "*", "5-6")
+		t.Fatalf("GenerateStreamEntryId(%q) panicked", "*")
 	}
 	if err != nil {
 		t.Fatalf("GenerateStreamEntryId(%q) error = %v, want nil", "*", err)
 	}
-	if id != "5-6" {
-		t.Errorf("GenerateStreamEntryId(%q) = %q, want %q", "*", id, "5-6")
+
+	ms, seq, err := splitId(id)
+	if err != nil {
+		t.Fatalf("GenerateStreamEntryId(%q) = %q, not a valid id: %v", "*", id, err)
+	}
+	switch {
+	case ms == now && seq != 6:
+		t.Errorf("GenerateStreamEntryId(%q) = %d-%d, want seq 6: the clock hasn't advanced past the last entry's ms", "*", ms, seq)
+	case ms > now && seq != 0:
+		t.Errorf("GenerateStreamEntryId(%q) = %d-%d, want seq 0: the clock advanced to a new ms", "*", ms, seq)
+	case ms < now:
+		t.Errorf("GenerateStreamEntryId(%q) ms = %d, want >= %d: id must never go backward", "*", ms, now)
 	}
 }
 
@@ -240,5 +265,20 @@ func TestGenerateStreamEntryId_NoWildcard_ReturnsEmptyResult(t *testing.T) {
 	}
 	if id != "" {
 		t.Errorf("GenerateStreamEntryId(%q) = %q, want empty string (no wildcard to generate)", "5-5", id)
+	}
+}
+
+func TestGenerateStreamEntryId_FreshStream_MsZero_SeqStartsAtOne(t *testing.T) {
+	st := New()
+
+	id, err, panicked := safeGenerate(t, st, "0-*")
+	if panicked {
+		t.Fatalf("GenerateStreamEntryId(%q) on a fresh stream panicked, want %q", "0-*", "0-1")
+	}
+	if err != nil {
+		t.Fatalf("GenerateStreamEntryId(%q) error = %v, want nil", "0-*", err)
+	}
+	if id != "0-1" {
+		t.Errorf("GenerateStreamEntryId(%q) = %q, want %q: 0-0 is a reserved id", "0-*", id, "0-1")
 	}
 }
