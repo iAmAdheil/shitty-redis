@@ -101,10 +101,12 @@ func (com *Com) rpush() ([]byte, error) {
 	}
 
 	lp.RPUSH(values)
+	// calculate before listeners change change len
+	len := lp.LLEN()
 
 	e.handleListeners(lp)
 
-	return RESPEncoder(lp.LLEN(), Int), nil
+	return RESPEncoder(len, Int), nil
 }
 
 func (com *Com) lrange() ([]byte, error) {
