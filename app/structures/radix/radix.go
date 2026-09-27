@@ -163,7 +163,12 @@ func (r *RaxNode) Get(id []byte) *streamlistpack.StreamListpack {
 
 // find appropriate raxnode -> streamlistpack that could hold id
 // greatest rax <= id
+// return nil if smallest rax > id || radix tree empty
 func (r *RaxNode) FindPredRax(id []byte) (res *streamlistpack.StreamListpack) {
+	if r.IsEmpty() {
+		return nil
+	}
+
 	fb := id[0]
 	var next *RaxNode
 
@@ -201,18 +206,16 @@ func (r *RaxNode) FindPredRax(id []byte) (res *streamlistpack.StreamListpack) {
 
 // smallest rax >= id
 func (r *RaxNode) FindSucRax(id []byte) (res *streamlistpack.StreamListpack) {
+	if r.IsEmpty() {
+		return nil
+	}
+
 	fb := id[0]
 	var next *RaxNode
 
-	// go to predecessor if:
-	//  - key does not exist
-	// 	- prefix for key's node is greater than id
 	next = r.Children[fb]
 	if next != nil {
 		prefLen := len(next.Prefix)
-		// r == 0 -> recurse downwards
-		// r == 0 && len(next.Prefix) == len(id) -> return value -> exact match
-		// r == -1 -> get max
 		r := bytes.Compare(next.Prefix, id[:prefLen])
 		if r == 0 {
 			if prefLen == len(id) {

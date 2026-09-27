@@ -93,15 +93,25 @@ func (st *Stream) GenerateStreamEntryId(id string) (string, error) {
 
 // handle ms only -> append seq
 func formatXRANGEIds(low, high string) (string, string) {
-	pLow := strings.Split(low, "-")
-	pHigh := strings.Split(high, "-")
+	var (
+		resLow  = low
+		resHigh = high
+	)
 
-	if len(pLow) == 1 {
-		low += "-0"
+	if low == "-" {
+		resLow = "0-1"
+	} else {
+		pLow := strings.Split(resLow, "-")
+		if len(pLow) == 1 {
+			resLow += "-0"
+		}
 	}
+
+	pHigh := strings.Split(resHigh, "-")
+
 	if len(pHigh) == 1 {
-		high += fmt.Sprintf("-%d", uint64(math.MaxUint64))
+		resHigh += fmt.Sprintf("-%d", uint64(math.MaxUint64))
 	}
 
-	return low, high
+	return resLow, resHigh
 }

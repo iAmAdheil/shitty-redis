@@ -82,6 +82,9 @@ func (st *Stream) XRANGE(l, h string) ([]string, error) {
 	high = binary.BigEndian.AppendUint64(high, seqH)
 
 	cur := st.Rax.FindPredRax(low) // starting rax node
+	if cur == nil && !st.Rax.IsEmpty() {
+		cur = st.Rax.GetMin()
+	}
 	for {
 		// if no pred exists || raxnode head greater than high
 		if cur == nil || msH < cur.Ms || (msH == cur.Ms && seqH < cur.Seq) {
