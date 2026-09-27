@@ -125,7 +125,7 @@ func (q *List) LPOP(c int) (elements []string) {
 	var node *Node = q.Head
 
 	for c > 0 && node != nil {
-		ele, err := node.Listpack.PopL()
+		ele, err := node.Listpack.PopL(0)
 		// fails if node empty, change head, drop node
 		if err != nil {
 			q.Head = node.Next

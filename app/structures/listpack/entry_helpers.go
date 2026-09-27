@@ -132,7 +132,55 @@ func handleStrEntry(val string) (entry []byte) {
 	return entry
 }
 
-func getEntry(item string) []byte {
+func getBacklenByteCount(l int) int {
+	switch {
+	case l <= 127:
+		return 1
+	case l <= 16383:
+		return 2
+	case l <= 2097151:
+		return 3
+	case l <= 268435455:
+		return 4
+	default:
+		return 5
+	}
+}
+
+func getBacklenBytes(l int) []byte {
+	bl := []byte{}
+	ul := uint64(l)
+	switch {
+	case l <= 127:
+		b1 := uint8(ul) & 0x7F // 7 bits, most significant -> 0
+		bl = append(bl, b1)
+	case l <= 16383:
+		b1 := uint8(ul) | 0x80    // 7 bits, most significant -> 1
+		b2 := uint8(ul>>7) & 0x7F // 7 bits, most significant -> 0
+		bl = append(bl, b1, b2)
+	case l <= 2097151:
+		b1 := uint8(ul) | 0x80     // 7 bits, most significant -> 1
+		b2 := uint8(ul>>7) | 0x80  // 7 bits, most significant -> 1
+		b3 := uint8(ul>>14) & 0x7F // 7 bits, most significant -> 0
+		bl = append(bl, b1, b2, b3)
+	case l <= 268435455:
+		b1 := uint8(ul) | 0x80     // 7 bits, most significant -> 1
+		b2 := uint8(ul>>7) | 0x80  // 7 bits, most significant -> 1
+		b3 := uint8(ul>>14) | 0x80 // 7 bits, most significant -> 1
+		b4 := uint8(ul>>21) & 0x7F // 7 bits, most significant -> 0
+		bl = append(bl, b1, b2, b3, b4)
+	default:
+		b1 := uint8(ul) | 0x80     // 7 bits, most significant -> 1
+		b2 := uint8(ul>>7) | 0x80  // 7 bits, most significant -> 1
+		b3 := uint8(ul>>14) | 0x80 // 7 bits, most significant -> 1
+		b4 := uint8(ul>>21) | 0x80 // 7 bits, most significant -> 1
+		b5 := uint8(ul>>28) & 0x7F // 7 bits, most significant -> 0
+		bl = append(bl, b1, b2, b3, b4, b5)
+	}
+	return bl
+}
+
+func GetEntry(item string) []byte {
 	var entry []byte
 	/*
 		- parse value into a number, else string
@@ -146,8 +194,8 @@ func getEntry(item string) []byte {
 	}
 
 	// add backlen -> includes backlen byte as well
-	backlen := uint8(len(entry))
-	entry = append(entry, backlen)
+	backlen := getBacklenBytes(len(entry))
+	entry = append(entry, backlen...)
 
 	return entry
 }
