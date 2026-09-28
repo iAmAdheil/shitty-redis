@@ -98,7 +98,7 @@ func formatXRANGEIds(low, high string) (string, string) {
 		resHigh = high
 	)
 
-	if low == "-" {
+	if resLow == "-" {
 		resLow = "0-1"
 	} else {
 		pLow := strings.Split(resLow, "-")
@@ -107,10 +107,14 @@ func formatXRANGEIds(low, high string) (string, string) {
 		}
 	}
 
-	pHigh := strings.Split(resHigh, "-")
+	if resHigh == "+" {
+		resHigh = fmt.Sprintf("%d-%d", uint64(math.MaxUint64), uint64(math.MaxUint64))
+	} else {
+		pHigh := strings.Split(resHigh, "-")
 
-	if len(pHigh) == 1 {
-		resHigh += fmt.Sprintf("-%d", uint64(math.MaxUint64))
+		if len(pHigh) == 1 {
+			resHigh += fmt.Sprintf("-%d", uint64(math.MaxUint64))
+		}
 	}
 
 	return resLow, resHigh
