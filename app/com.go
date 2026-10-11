@@ -2,7 +2,9 @@ package main
 
 import (
 	"errors"
+	"slices"
 	"strconv"
+	"strings"
 )
 
 // #D1 -> using []string as arg value for now. If it does not work out, go for any in the future
@@ -51,6 +53,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateXAdd(args)
 	case "xrange":
 		err = com.ValidateXRange(args)
+	case "xread":
+		err = com.ValidateXRead(args)
 	}
 
 	return com, err
@@ -84,6 +88,8 @@ func (com *Com) HandleCom() ([]byte, error) {
 		return com.xadd()
 	case "xrange":
 		return com.xrange()
+	case "xread":
+		return com.xread()
 
 	default:
 		return nil, nil
@@ -288,6 +294,44 @@ func (com *Com) ValidateXRange(args []string) error {
 		com.Args["high"] = []string{args[2]}
 	} else {
 		return errors.New("XRange expects upper range to be passed as an argument")
+	}
+
+	return nil
+}
+
+func (com *Com) ValidateXRead(args []string) error {
+	target := "streams"
+
+	var copy []string // check for 'streams' keyword -> case insensitive
+	for _, arg := range args {
+		copy = append(copy, strings.ToLower(arg))
+	}
+
+	idx := slices.Index(copy, target)
+	if idx == -1 {
+		return errors.New("Xread expects 'STREAMS' to be passed as a required argument")
+	}
+
+	nonReqs := args[:idx]
+	reqs := args[idx+1:]
+
+	// build req args
+	if len(reqs)%2 != 0 {
+		return errors.New("Invalid XRead arguments")
+	}
+	for i := 0; i < len(reqs); i++ {
+		c := len(reqs) / 2
+		com.Args["keys"] = reqs[:c]
+		com.Args["ids"] = reqs[c:]
+	}
+
+	// build non-req args
+	for i := 0; i < len(nonReqs); i++ {
+		opt := nonReqs[i]
+		val := nonReqs[i+1]
+		i++
+
+		com.Extras[strings.ToLower(opt)] = []string{val}
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package stream
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/codecrafters-io/redis-starter-go/app/structures/radix"
 	streamlistpack "github.com/codecrafters-io/redis-starter-go/app/structures/stream/stream_listpack"
@@ -106,8 +107,14 @@ func (st *Stream) XRANGE(l, h string) ([]string, error) {
 		}
 
 		next := []byte{}
-		next = binary.BigEndian.AppendUint64(next, msEnd)
-		next = binary.BigEndian.AppendUint64(next, seqEnd+1)
+		// (@iAmAdheil) -> also check for max msEnd values
+		if seqEnd < math.MaxUint64 {
+			next = binary.BigEndian.AppendUint64(next, msEnd+1)
+			next = binary.BigEndian.AppendUint64(next, seqEnd)
+		} else {
+			next = binary.BigEndian.AppendUint64(next, msEnd)
+			next = binary.BigEndian.AppendUint64(next, seqEnd+1)
+		}
 
 		cur = st.Rax.FindSucRax(next)
 	}
@@ -126,6 +133,78 @@ func (st *Stream) XRANGE(l, h string) ([]string, error) {
 		}
 
 		res = append(res, s)
+	}
+
+	return res, nil
+}
+
+func (st *Stream) XREAD(l string) (string, error) {
+	var res string // final string -> all stream entries
+	entries := []*streamlistpack.Entry{}
+
+	msL, seqL, err := splitId(l)
+	if err != nil {
+		return "", err
+	}
+	var msH, seqH uint64 = math.MaxUint64, math.MaxUint64
+
+	low := []byte{}
+	// ids for radix node search
+	// start from next lowest id
+	if seqL < math.MaxUint64 {
+		low = binary.BigEndian.AppendUint64(low, msL)
+		low = binary.BigEndian.AppendUint64(low, seqL+1)
+	} else {
+		low = binary.BigEndian.AppendUint64(low, msL+1)
+		low = binary.BigEndian.AppendUint64(low, seqL)
+	}
+
+	cur := st.Rax.FindPredRax(low) // starting rax node
+	if cur == nil && !st.Rax.IsEmpty() {
+		cur = st.Rax.GetMin()
+	}
+	for {
+		// if no pred exists || raxnode head greater than high
+		if cur == nil || msH < cur.Ms || (msH == cur.Ms && seqH < cur.Seq) {
+			break
+		}
+
+		e := cur.ReadAllInRange(msL, seqL, msH, seqH)
+		var msEnd uint64
+		var seqEnd uint64
+		if len(e) > 0 {
+			entries = append(entries, e...)
+
+			// get ms and seq for last entry in
+			msEnd = e[len(e)-1].Ms
+			seqEnd = e[len(e)-1].Seq
+		} else {
+			msEnd = cur.Ms
+			seqEnd = cur.Seq
+		}
+
+		next := []byte{}
+		next = binary.BigEndian.AppendUint64(next, msEnd)
+		next = binary.BigEndian.AppendUint64(next, seqEnd+1)
+
+		cur = st.Rax.FindSucRax(next)
+	}
+
+	res += fmt.Sprintf("*%d\r\n", len(entries))
+	for _, entry := range entries {
+		id := fmt.Sprintf("%d-%d", entry.Ms, entry.Seq)
+
+		var s string = "*2\r\n"
+		s += fmt.Sprintf("$%d\r\n%s\r\n", len(id), id)
+
+		s += fmt.Sprintf("*%d\r\n", len(entry.Data))
+
+		for i := 0; i < len(entry.Data); i += 2 {
+			s += fmt.Sprintf("$%d\r\n%s\r\n", len(entry.Data[i]), entry.Data[i])
+			s += fmt.Sprintf("$%d\r\n%s\r\n", len(entry.Data[i+1]), entry.Data[i+1])
+		}
+
+		res += s
 	}
 
 	return res, nil

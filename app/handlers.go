@@ -380,3 +380,42 @@ func (com *Com) xrange() ([]byte, error) {
 
 	return RESPEncoder(entries, Array), nil
 }
+
+func (com *Com) xread() ([]byte, error) {
+	keys := com.Args["keys"]
+	ids := com.Args["ids"]
+
+	res := []string{}
+
+	kmu.RLock()
+	defer kmu.RUnlock()
+
+	for i, key := range keys {
+		var s string
+		id := ids[i]
+
+		e, ok := keyspace[key]
+		// DNE
+		if !ok {
+			continue
+		}
+
+		st, ok := e.Data.(*stream.Stream)
+		if e.Type != TypeStream || !ok {
+			return nil, errors.New("Operation against a key holding the wrong kind of value")
+		}
+
+		strEntry, err := st.XREAD(id)
+		if len(strEntry) == 0 || err != nil {
+			continue
+		}
+
+		s += "*2\r\n"
+		s += fmt.Sprintf("$%d\r\n%s\r\n", len(key), key)
+		s += strEntry
+
+		res = append(res, s)
+	}
+
+	return RESPEncoder(res, Array), nil
+}
