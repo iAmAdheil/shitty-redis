@@ -29,8 +29,9 @@ func NewStructure(t DataType, data any) *Structure {
 	}
 }
 
-func WakeAllXREADListeners(key string) {
-	for _, ch := range xreadWaiters[key] {
-		ch <- key
-	}
+// each structure has its own conditions for deletion
+// checked by the caller, before func call
+// handled by the caller, under its own lock phase
+func DeleteStructure(key string) {
+	delete(keyspace, key)
 }

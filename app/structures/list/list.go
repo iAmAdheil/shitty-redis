@@ -32,3 +32,7 @@ func NewNode() *Node {
 		Listpack: listpack.New(),
 	}
 }
+
+func (q *List) GetCount() int {
+	return q.count
+}

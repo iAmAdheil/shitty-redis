@@ -55,6 +55,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateXRange(args)
 	case "xread":
 		err = com.ValidateXRead(args)
+	case "incr":
+		err = com.ValidateINCR(args)
 	}
 
 	return com, err
@@ -90,6 +92,8 @@ func (com *Com) HandleCom() ([]byte, error) {
 		return com.xrange()
 	case "xread":
 		return com.xread()
+	case "incr":
+		return com.incr()
 
 	default:
 		return nil, nil
@@ -332,6 +336,16 @@ func (com *Com) ValidateXRead(args []string) error {
 		val := nonReqs[i]
 
 		com.Extras[strings.ToLower(opt)] = []string{val}
+	}
+
+	return nil
+}
+
+func (com *Com) ValidateINCR(args []string) error {
+	if len(args) >= 1 {
+		com.Args["key"] = []string{args[0]}
+	} else {
+		return errors.New("INCR expects a key to be passed as an argument")
 	}
 
 	return nil

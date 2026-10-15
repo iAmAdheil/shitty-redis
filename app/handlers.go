@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -105,6 +106,9 @@ func (com *Com) rpush() ([]byte, error) {
 	len := lp.LLEN()
 
 	handleBLPOPListeners(lp, key)
+	if lp.GetCount() == 0 {
+		DeleteStructure(key)
+	}
 
 	return RESPEncoder(len, Int), nil
 }
@@ -164,10 +168,14 @@ func (com *Com) lpush() ([]byte, error) {
 	}
 
 	lp.LPUSH(values)
+	len := lp.LLEN()
 
 	handleBLPOPListeners(lp, key)
+	if lp.GetCount() == 0 {
+		DeleteStructure(key)
+	}
 
-	return RESPEncoder(lp.LLEN(), Int), nil
+	return RESPEncoder(len, Int), nil
 }
 
 func (com *Com) llen() ([]byte, error) {
@@ -247,7 +255,7 @@ func (com *Com) blpop() ([]byte, error) {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		ch = make(chan string)
+		ch = make(chan string, 1)
 		// create a new entry and push the listener
 		blpopWaiters[key] = append(blpopWaiters[key], ch)
 
@@ -262,7 +270,7 @@ func (com *Com) blpop() ([]byte, error) {
 			out = append(out, element...)
 			res = RESPEncoder(out, BulkList)
 		} else {
-			ch = make(chan string)
+			ch = make(chan string, 1)
 			blpopWaiters[key] = append(blpopWaiters[key], ch)
 		}
 	}
@@ -388,6 +396,11 @@ func (com *Com) xread() ([]byte, error) {
 		e, ok := keyspace[key]
 		// DNE
 		if !ok {
+			if ids[i] == "$" {
+				// any id after 0-0 is eligible
+				// stream does not currently exist
+				ids[i] = "0-0"
+			}
 			continue
 		}
 
@@ -539,4 +552,36 @@ func (com *Com) xread() ([]byte, error) {
 			}
 		}
 	}
+}
+
+func (com *Com) incr() ([]byte, error) {
+	key := com.Args["key"][0]
+
+	kmu.Lock()
+	defer kmu.Unlock()
+
+	e, ok := keyspace[key]
+	if !ok {
+		val := "1"
+		keyspace[key] = NewStructure(TypeVar, &val)
+		return RESPEncoder(1, Int), nil
+	}
+
+	v, ok := e.Data.(*string)
+	if !ok {
+		return nil, errors.New("Operation against a key holding the wrong kind of value")
+	}
+
+	val, err := strconv.ParseInt(*v, 10, 64)
+	if err != nil {
+		return nil, errors.New("Value is not an integer or out of range")
+	}
+
+	if val == math.MaxInt64 {
+		return nil, errors.New("Increment or decrement would overflow")
+	}
+
+	val++
+	*v = strconv.FormatInt(val, 10)
+	return RESPEncoder(int(val), Int), nil
 }

@@ -13,6 +13,16 @@ import (
 // # Imp points (@iAmAdheil) -> pls take a look later
 // - arg validation should happen during decoding -> string to int conversions should not happen within my com handlers
 
+func WakeAllXREADListeners(key string) {
+	for _, ch := range xreadWaiters[key] {
+		select {
+		case ch <- key:
+		// skip if full
+		default:
+		}
+	}
+}
+
 func handleBLPOPListeners(lp *list.List, key string) {
 	var pop int
 

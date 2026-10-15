@@ -34,6 +34,9 @@ func New() *Stream {
 }
 
 func (st *Stream) GetLastId() (uint64, uint64) {
+	if st.LastId == nil {
+		return 0, 0
+	}
 	return st.LastId.ms, st.LastId.seq
 }
 
