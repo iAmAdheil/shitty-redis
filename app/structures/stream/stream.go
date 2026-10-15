@@ -154,9 +154,11 @@ func (st *Stream) XREAD(l string) (string, error) {
 	if seqL < math.MaxUint64 {
 		low = binary.BigEndian.AppendUint64(low, msL)
 		low = binary.BigEndian.AppendUint64(low, seqL+1)
+		seqL++
 	} else {
 		low = binary.BigEndian.AppendUint64(low, msL+1)
 		low = binary.BigEndian.AppendUint64(low, seqL)
+		msL++
 	}
 
 	cur := st.Rax.FindPredRax(low) // starting rax node
@@ -190,7 +192,9 @@ func (st *Stream) XREAD(l string) (string, error) {
 		cur = st.Rax.FindSucRax(next)
 	}
 
-	res += fmt.Sprintf("*%d\r\n", len(entries))
+	if len(entries) > 0 {
+		res += fmt.Sprintf("*%d\r\n", len(entries))
+	}
 	for _, entry := range entries {
 		id := fmt.Sprintf("%d-%d", entry.Ms, entry.Seq)
 

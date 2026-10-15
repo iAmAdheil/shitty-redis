@@ -13,19 +13,24 @@ const (
 )
 
 type Structure struct {
-	Type      DataType
-	Data      any
-	Listeners []chan string // waiters blocked on this key (BLPOP, XREAD BLOCK)
+	Type DataType
+	Data any
 }
 
 var keyspace = make(map[string]*Structure)
+var blpopWaiters = make(map[string][]chan string)
+var xreadWaiters = make(map[string][]chan string)
 var kmu *sync.RWMutex = &sync.RWMutex{}
 
 func NewStructure(t DataType, data any) *Structure {
 	return &Structure{
 		Type: t,
 		Data: data,
-		// init empty
-		Listeners: []chan string{},
+	}
+}
+
+func WakeAllXREADListeners(key string) {
+	for _, ch := range xreadWaiters[key] {
+		ch <- key
 	}
 }

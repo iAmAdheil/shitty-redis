@@ -104,7 +104,7 @@ func (com *Com) rpush() ([]byte, error) {
 	// calculate before listeners change change len
 	len := lp.LLEN()
 
-	e.handleListeners(lp)
+	handleBLPOPListeners(lp, key)
 
 	return RESPEncoder(len, Int), nil
 }
@@ -165,7 +165,7 @@ func (com *Com) lpush() ([]byte, error) {
 
 	lp.LPUSH(values)
 
-	e.handleListeners(lp)
+	handleBLPOPListeners(lp, key)
 
 	return RESPEncoder(lp.LLEN(), Int), nil
 }
@@ -216,7 +216,7 @@ func (com *Com) lpop() ([]byte, error) {
 	out = lp.LPOP(c)
 
 	// delete key when list is empty, 0 waiting listeners
-	if len(e.Listeners) == 0 && lp.LLEN() == 0 {
+	if len(blpopWaiters[key]) == 0 && lp.LLEN() == 0 {
 		delete(keyspace, key)
 	}
 
@@ -249,9 +249,7 @@ func (com *Com) blpop() ([]byte, error) {
 	if !ok {
 		ch = make(chan string)
 		// create a new entry and push the listener
-		e = NewStructure(TypeList, list.New())
-		keyspace[key] = e
-		e.Listeners = append(e.Listeners, ch)
+		blpopWaiters[key] = append(blpopWaiters[key], ch)
 
 	} else {
 		lp, ok := e.Data.(*list.List)
@@ -265,7 +263,7 @@ func (com *Com) blpop() ([]byte, error) {
 			res = RESPEncoder(out, BulkList)
 		} else {
 			ch = make(chan string)
-			e.Listeners = append(e.Listeners, ch)
+			blpopWaiters[key] = append(blpopWaiters[key], ch)
 		}
 	}
 	kmu.Unlock()
@@ -292,14 +290,7 @@ func (com *Com) blpop() ([]byte, error) {
 		kmu.Lock()
 		defer kmu.Unlock()
 
-		e, ok := keyspace[key]
-		// DNE
-		if !ok {
-			// something went wrong
-			// key got deleted with the client's listener(ch) missing
-		}
-
-		isExists := e.findAndPopCh(ch)
+		isExists := findAndPopCh(ch, key, com.Base)
 		// channel popped from the list, no value pushed
 		if isExists {
 			res = RESPEncoder(nil, NullBulkList)
@@ -351,6 +342,8 @@ func (com *Com) xadd() ([]byte, error) {
 	}
 	st.XADD(data, id)
 
+	WakeAllXREADListeners(key)
+
 	return RESPEncoder(id, Bulk), nil
 }
 
@@ -387,8 +380,7 @@ func (com *Com) xread() ([]byte, error) {
 
 	res := []string{}
 
-	kmu.RLock()
-	defer kmu.RUnlock()
+	kmu.Lock()
 
 	for i, key := range keys {
 		var s string
@@ -402,6 +394,7 @@ func (com *Com) xread() ([]byte, error) {
 
 		st, ok := e.Data.(*stream.Stream)
 		if e.Type != TypeStream || !ok {
+			kmu.Unlock() // handle early return
 			return nil, errors.New("Operation against a key holding the wrong kind of value")
 		}
 
@@ -417,5 +410,131 @@ func (com *Com) xread() ([]byte, error) {
 		res = append(res, s)
 	}
 
-	return RESPEncoder(res, Array), nil
+	_, ok := com.Extras["block"] // duration
+	// non-blocking path
+	// return whatever result is available
+	if len(res) > 0 || !ok {
+		kmu.Unlock() // unlock before return
+		if len(res) == 0 {
+			return RESPEncoder(nil, NullBulkList), nil
+		}
+		return RESPEncoder(res, Array), nil
+	}
+	// blocking path
+	ch := make(chan string, 1)
+	var expch <-chan time.Time
+
+	timeout, err := strconv.ParseFloat(com.Extras["block"][0], 64)
+	if err != nil {
+		kmu.Unlock() // handle early return
+		return nil, errors.New("Invalid XREAD block timeout")
+	}
+
+	for _, key := range keys {
+		if _, ok := xreadWaiters[key]; !ok {
+			xreadWaiters[key] = []chan string{ch}
+		} else {
+			xreadWaiters[key] = append(xreadWaiters[key], ch)
+		}
+	}
+
+	kmu.Unlock() // listeners added, release
+
+	if timeout > 0 {
+		// activate chan after interval
+		duration := time.Duration(timeout * float64(time.Millisecond))
+		expch = time.After(duration)
+	}
+
+	for {
+		select {
+		case <-ch: // Transmit Structure key channel
+			kmu.Lock()
+
+			for i, key := range keys {
+				var s string
+				id := ids[i]
+
+				e, ok := keyspace[key]
+				// DNE
+				if !ok {
+					continue
+				}
+
+				st, ok := e.Data.(*stream.Stream)
+				if e.Type != TypeStream || !ok {
+					kmu.Unlock() // handle early return
+					return nil, errors.New("Operation against a key holding the wrong kind of value")
+				}
+
+				strEntry, err := st.XREAD(id)
+				if len(strEntry) == 0 || err != nil {
+					continue
+				}
+
+				s += "*2\r\n"
+				s += fmt.Sprintf("$%d\r\n%s\r\n", len(key), key)
+				s += strEntry
+
+				res = append(res, s)
+			}
+
+			if len(res) == 0 {
+				kmu.Unlock()
+				continue
+			}
+
+			findAndPopChFromKeys(keys, ch, com.Base)
+			kmu.Unlock()
+
+			fmt.Println("returning from ch:", res)
+			return RESPEncoder(res, Array), nil
+
+		case <-expch:
+			kmu.Lock()
+			defer kmu.Unlock()
+			findAndPopChFromKeys(keys, ch, com.Base)
+
+			select {
+			case <-ch:
+				for i, key := range keys {
+					var s string
+					id := ids[i]
+
+					e, ok := keyspace[key]
+					// DNE
+					if !ok {
+						continue
+					}
+
+					st, ok := e.Data.(*stream.Stream)
+					if e.Type != TypeStream || !ok {
+						kmu.Unlock() // handle early return
+						return nil, errors.New("Operation against a key holding the wrong kind of value")
+					}
+
+					strEntry, err := st.XREAD(id)
+					if len(strEntry) == 0 || err != nil {
+						continue
+					}
+
+					s += "*2\r\n"
+					s += fmt.Sprintf("$%d\r\n%s\r\n", len(key), key)
+					s += strEntry
+
+					res = append(res, s)
+				}
+
+				fmt.Println("returning from ch expch:", res)
+				if len(res) == 0 {
+					return RESPEncoder(nil, NullBulkList), nil
+				}
+				return RESPEncoder(res, Array), nil
+
+			default: // null ch
+				fmt.Println("returning from null ch expch:", res)
+				return RESPEncoder(nil, NullBulkList), nil
+			}
+		}
+	}
 }

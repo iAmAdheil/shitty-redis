@@ -96,6 +96,7 @@ const (
 	NullBulkList
 	SimpleErr
 	Array
+	Random
 )
 
 var typeName = map[EncodeType]string{

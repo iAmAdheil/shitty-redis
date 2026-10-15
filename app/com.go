@@ -328,8 +328,8 @@ func (com *Com) ValidateXRead(args []string) error {
 	// build non-req args
 	for i := 0; i < len(nonReqs); i++ {
 		opt := nonReqs[i]
-		val := nonReqs[i+1]
 		i++
+		val := nonReqs[i]
 
 		com.Extras[strings.ToLower(opt)] = []string{val}
 	}
