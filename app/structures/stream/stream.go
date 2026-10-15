@@ -33,6 +33,10 @@ func New() *Stream {
 	}
 }
 
+func (st *Stream) GetLastId() (uint64, uint64) {
+	return st.LastId.ms, st.LastId.seq
+}
+
 func (st *Stream) XADD(data []string, idS string) {
 	var lp *streamlistpack.StreamListpack
 	ms, seq, _ := splitId(idS) // validated Id, can ignore error here

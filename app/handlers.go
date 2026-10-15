@@ -384,7 +384,6 @@ func (com *Com) xread() ([]byte, error) {
 
 	for i, key := range keys {
 		var s string
-		id := ids[i]
 
 		e, ok := keyspace[key]
 		// DNE
@@ -398,6 +397,12 @@ func (com *Com) xread() ([]byte, error) {
 			return nil, errors.New("Operation against a key holding the wrong kind of value")
 		}
 
+		if ids[i] == "$" {
+			ms, seq := st.GetLastId()
+			ids[i] = fmt.Sprintf("%d-%d", ms, seq)
+		}
+
+		id := ids[i]
 		strEntry, err := st.XREAD(id)
 		if len(strEntry) == 0 || err != nil {
 			continue
@@ -487,7 +492,6 @@ func (com *Com) xread() ([]byte, error) {
 			findAndPopChFromKeys(keys, ch, com.Base)
 			kmu.Unlock()
 
-			fmt.Println("returning from ch:", res)
 			return RESPEncoder(res, Array), nil
 
 		case <-expch:
@@ -525,14 +529,12 @@ func (com *Com) xread() ([]byte, error) {
 					res = append(res, s)
 				}
 
-				fmt.Println("returning from ch expch:", res)
 				if len(res) == 0 {
 					return RESPEncoder(nil, NullBulkList), nil
 				}
 				return RESPEncoder(res, Array), nil
 
 			default: // null ch
-				fmt.Println("returning from null ch expch:", res)
 				return RESPEncoder(nil, NullBulkList), nil
 			}
 		}
