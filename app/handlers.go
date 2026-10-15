@@ -574,11 +574,11 @@ func (com *Com) incr() ([]byte, error) {
 
 	val, err := strconv.ParseInt(*v, 10, 64)
 	if err != nil {
-		return nil, errors.New("Value is not an integer or out of range")
+		return nil, errors.New("value is not an integer or out of range")
 	}
 
 	if val == math.MaxInt64 {
-		return nil, errors.New("Increment or decrement would overflow")
+		return nil, errors.New("increment or decrement would overflow")
 	}
 
 	val++
