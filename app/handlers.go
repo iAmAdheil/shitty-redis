@@ -589,3 +589,7 @@ func (com *Com) incr() ([]byte, error) {
 func (com *Com) multi() ([]byte, error) {
 	return RESPEncoder("OK", Simple), nil
 }
+
+func (com *Com) exec() ([]byte, error) {
+	return nil, errors.New("EXEC without MULTI")
+}

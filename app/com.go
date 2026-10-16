@@ -59,6 +59,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateIncr(args)
 	case "multi":
 		err = com.ValidateMulti(args)
+	case "exec":
+		err = com.ValidateExec(args)
 	}
 
 	return com, err
@@ -98,6 +100,8 @@ func (com *Com) HandleCom() ([]byte, error) {
 		return com.incr()
 	case "multi":
 		return com.multi()
+	case "exec":
+		return com.exec()
 
 	default:
 		return nil, nil
@@ -356,5 +360,9 @@ func (com *Com) ValidateIncr(args []string) error {
 }
 
 func (com *Com) ValidateMulti(args []string) error {
+	return nil
+}
+
+func (com *Com) ValidateExec(args []string) error {
 	return nil
 }
