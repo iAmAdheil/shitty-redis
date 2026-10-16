@@ -585,3 +585,7 @@ func (com *Com) incr() ([]byte, error) {
 	*v = strconv.FormatInt(val, 10)
 	return RESPEncoder(int(val), Int), nil
 }
+
+func (com *Com) multi() ([]byte, error) {
+	return RESPEncoder("OK", Simple), nil
+}

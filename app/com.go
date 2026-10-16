@@ -56,7 +56,9 @@ func GetCom(base string, args []string) (*Com, error) {
 	case "xread":
 		err = com.ValidateXRead(args)
 	case "incr":
-		err = com.ValidateINCR(args)
+		err = com.ValidateIncr(args)
+	case "multi":
+		err = com.ValidateMulti(args)
 	}
 
 	return com, err
@@ -94,6 +96,8 @@ func (com *Com) HandleCom() ([]byte, error) {
 		return com.xread()
 	case "incr":
 		return com.incr()
+	case "multi":
+		return com.multi()
 
 	default:
 		return nil, nil
@@ -341,12 +345,16 @@ func (com *Com) ValidateXRead(args []string) error {
 	return nil
 }
 
-func (com *Com) ValidateINCR(args []string) error {
+func (com *Com) ValidateIncr(args []string) error {
 	if len(args) >= 1 {
 		com.Args["key"] = []string{args[0]}
 	} else {
 		return errors.New("INCR expects a key to be passed as an argument")
 	}
 
+	return nil
+}
+
+func (com *Com) ValidateMulti(args []string) error {
 	return nil
 }
