@@ -61,6 +61,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateMulti(args)
 	case "exec":
 		err = com.ValidateExec(args)
+	case "discard":
+		err = com.ValidateDiscard(args)
 	}
 
 	return com, err
@@ -102,6 +104,8 @@ func (com *Com) HandleCom(state *State) ([]byte, error) {
 		return com.multi(state)
 	case "exec":
 		return com.exec(state)
+	case "discard":
+		return com.discard(state)
 
 	default:
 		return nil, nil
@@ -364,5 +368,9 @@ func (com *Com) ValidateMulti(args []string) error {
 }
 
 func (com *Com) ValidateExec(args []string) error {
+	return nil
+}
+
+func (com *Com) ValidateDiscard(args []string) error {
 	return nil
 }

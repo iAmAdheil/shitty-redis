@@ -611,3 +611,14 @@ func (com *Com) exec(state *State) ([]byte, error) {
 	state.isMulti = false
 	return RESPEncoder(res, Array), nil
 }
+
+func (com *Com) discard(state *State) ([]byte, error) {
+	if !state.isMulti {
+		return nil, errors.New("DISCARD without MULTI")
+	}
+
+	state.isMulti = false
+	clear(state.queue)
+
+	return RESPEncoder("OK", Simple), nil
+}
