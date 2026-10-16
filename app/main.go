@@ -25,6 +25,8 @@ func main() {
 }
 
 func HandleConn(conn net.Conn) {
+	state := NewState()
+
 	for {
 		in := make([]byte, 1000)
 
@@ -45,7 +47,7 @@ func HandleConn(conn net.Conn) {
 		if err != nil {
 			out = RESPEncoder(err.Error(), SimpleErr)
 		} else {
-			out, err = com.HandleCom()
+			out, err = com.HandleCom(state)
 			if err != nil {
 				out = RESPEncoder(err.Error(), SimpleErr)
 			}

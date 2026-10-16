@@ -66,7 +66,7 @@ func GetCom(base string, args []string) (*Com, error) {
 	return com, err
 }
 
-func (com *Com) HandleCom() ([]byte, error) {
+func (com *Com) HandleCom(state *State) ([]byte, error) {
 	switch com.Base {
 	case "ping":
 		return com.ping()
@@ -99,9 +99,9 @@ func (com *Com) HandleCom() ([]byte, error) {
 	case "incr":
 		return com.incr()
 	case "multi":
-		return com.multi()
+		return com.multi(state)
 	case "exec":
-		return com.exec()
+		return com.exec(state)
 
 	default:
 		return nil, nil

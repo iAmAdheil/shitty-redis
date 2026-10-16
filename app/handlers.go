@@ -586,10 +586,16 @@ func (com *Com) incr() ([]byte, error) {
 	return RESPEncoder(int(val), Int), nil
 }
 
-func (com *Com) multi() ([]byte, error) {
+func (com *Com) multi(state *State) ([]byte, error) {
+	state.isMulti = true
 	return RESPEncoder("OK", Simple), nil
 }
 
-func (com *Com) exec() ([]byte, error) {
-	return nil, errors.New("EXEC without MULTI")
+func (com *Com) exec(state *State) ([]byte, error) {
+	if !state.isMulti {
+		return nil, errors.New("EXEC without MULTI")
+	}
+
+	state.isMulti = false
+	return RESPEncoder([]string{}, Array), nil
 }
