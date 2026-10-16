@@ -596,6 +596,18 @@ func (com *Com) exec(state *State) ([]byte, error) {
 		return nil, errors.New("EXEC without MULTI")
 	}
 
+	var res []string = []string{}
+
+	for _, com := range state.queue {
+		out, err := com.HandleCom(state)
+		if err != nil {
+			e := RESPEncoder(err.Error(), SimpleErr)
+			res = append(res, string(e))
+		} else {
+			res = append(res, string(out))
+		}
+	}
+
 	state.isMulti = false
-	return RESPEncoder([]string{}, Array), nil
+	return RESPEncoder(res, Array), nil
 }
