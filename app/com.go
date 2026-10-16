@@ -63,6 +63,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateExec(args)
 	case "discard":
 		err = com.ValidateDiscard(args)
+	case "watch":
+		err = com.ValidateWatch(args)
 	}
 
 	return com, err
@@ -106,6 +108,8 @@ func (com *Com) HandleCom(state *State) ([]byte, error) {
 		return com.exec(state)
 	case "discard":
 		return com.discard(state)
+	case "watch":
+		return com.watch()
 
 	default:
 		return nil, nil
@@ -372,5 +376,9 @@ func (com *Com) ValidateExec(args []string) error {
 }
 
 func (com *Com) ValidateDiscard(args []string) error {
+	return nil
+}
+
+func (com *Com) ValidateWatch(args []string) error {
 	return nil
 }

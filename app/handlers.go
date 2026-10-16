@@ -622,3 +622,7 @@ func (com *Com) discard(state *State) ([]byte, error) {
 
 	return RESPEncoder("OK", Simple), nil
 }
+
+func (com *Com) watch() ([]byte, error) {
+	return RESPEncoder("OK", Simple), nil
+}
