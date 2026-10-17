@@ -109,7 +109,7 @@ func (com *Com) HandleCom(state *State) ([]byte, error) {
 	case "discard":
 		return com.discard(state)
 	case "watch":
-		return com.watch()
+		return com.watch(state)
 
 	default:
 		return nil, nil

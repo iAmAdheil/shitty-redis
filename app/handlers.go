@@ -587,12 +587,12 @@ func (com *Com) incr() ([]byte, error) {
 }
 
 func (com *Com) multi(state *State) ([]byte, error) {
-	state.isMulti = true
+	state.isTxn = true
 	return RESPEncoder("OK", Simple), nil
 }
 
 func (com *Com) exec(state *State) ([]byte, error) {
-	if !state.isMulti {
+	if !state.isTxn {
 		return nil, errors.New("EXEC without MULTI")
 	}
 
@@ -608,21 +608,25 @@ func (com *Com) exec(state *State) ([]byte, error) {
 		}
 	}
 
-	state.isMulti = false
+	state.isTxn = false
 	return RESPEncoder(res, Array), nil
 }
 
 func (com *Com) discard(state *State) ([]byte, error) {
-	if !state.isMulti {
+	if !state.isTxn {
 		return nil, errors.New("DISCARD without MULTI")
 	}
 
-	state.isMulti = false
+	state.isTxn = false
 	clear(state.queue)
 
 	return RESPEncoder("OK", Simple), nil
 }
 
-func (com *Com) watch() ([]byte, error) {
+func (com *Com) watch(state *State) ([]byte, error) {
+	if state.isTxn {
+		return nil, errors.New("WATCH inside MULTI is not allowed")
+	}
+
 	return RESPEncoder("OK", Simple), nil
 }
