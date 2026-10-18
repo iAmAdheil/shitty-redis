@@ -67,6 +67,7 @@ func (com *Com) set() ([]byte, error) {
 
 	kmu.Lock()
 	keyspace[key] = NewStructure(TypeVar, &val)
+	UpdateWatchers(key)
 	kmu.Unlock()
 
 	if len(com.Extras) > 0 {
@@ -596,6 +597,13 @@ func (com *Com) exec(state *State) ([]byte, error) {
 		return nil, errors.New("EXEC without MULTI")
 	}
 
+	if state.txn.dirty {
+		state.isTxn = false
+		state.txn.dirty = false
+		clear(state.txn.watched)
+		return RESPEncoder(nil, NullBulkList), nil
+	}
+
 	var res []string = []string{}
 
 	for _, com := range state.queue {
@@ -626,6 +634,14 @@ func (com *Com) discard(state *State) ([]byte, error) {
 func (com *Com) watch(state *State) ([]byte, error) {
 	if state.isTxn {
 		return nil, errors.New("WATCH inside MULTI is not allowed")
+	}
+
+	kmu.Lock()
+	defer kmu.Unlock()
+
+	for _, key := range com.Args["keys"] {
+		state.txn.watched = append(state.txn.watched, key)
+		watchers[key] = append(watchers[key], state.txn)
 	}
 
 	return RESPEncoder("OK", Simple), nil

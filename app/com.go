@@ -361,7 +361,7 @@ func (com *Com) ValidateIncr(args []string) error {
 	if len(args) >= 1 {
 		com.Args["key"] = []string{args[0]}
 	} else {
-		return errors.New("INCR expects a key to be passed as an argument")
+		return errors.New("Incr expects a key to be passed as an argument")
 	}
 
 	return nil
@@ -380,5 +380,15 @@ func (com *Com) ValidateDiscard(args []string) error {
 }
 
 func (com *Com) ValidateWatch(args []string) error {
+	if len(args) >= 1 {
+		keys := []string{}
+		for _, key := range args {
+			keys = append(keys, key)
+		}
+		com.Args["keys"] = keys
+	} else {
+		return errors.New("Watch expects atleast one key to be passed as an argument")
+	}
+
 	return nil
 }
