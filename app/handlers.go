@@ -67,7 +67,7 @@ func (com *Com) set() ([]byte, error) {
 
 	kmu.Lock()
 	keyspace[key] = NewStructure(TypeVar, &val)
-	UpdateWatchers(key)
+	SetWatchingTxnsDirty(key)
 	kmu.Unlock()
 
 	if len(com.Extras) > 0 {
@@ -587,22 +587,32 @@ func (com *Com) incr() ([]byte, error) {
 	return RESPEncoder(int(val), Int), nil
 }
 
+// isTxn is a per connection field
 func (com *Com) multi(state *State) ([]byte, error) {
+	if state.isTxn {
+		return nil, errors.New("MULTI calls can not be nested")
+	}
 	state.isTxn = true
 	return RESPEncoder("OK", Simple), nil
 }
 
+// txn endpoint
 func (com *Com) exec(state *State) ([]byte, error) {
 	if !state.isTxn {
 		return nil, errors.New("EXEC without MULTI")
 	}
 
+	kmu.Lock()
+	// lock to access txn state
+	// a second connection could be accessing txn
+	// at the same time, set dirty
+	// end txn and cleanup
 	if state.txn.dirty {
-		state.isTxn = false
-		state.txn.dirty = false
-		clear(state.txn.watched)
+		HandleTxnEnd(state)
+		kmu.Unlock()
 		return RESPEncoder(nil, NullBulkList), nil
 	}
+	kmu.Unlock()
 
 	var res []string = []string{}
 
@@ -616,7 +626,10 @@ func (com *Com) exec(state *State) ([]byte, error) {
 		}
 	}
 
-	state.isTxn = false
+	kmu.Lock()
+	HandleTxnEnd(state)
+	kmu.Unlock()
+
 	return RESPEncoder(res, Array), nil
 }
 
@@ -625,8 +638,7 @@ func (com *Com) discard(state *State) ([]byte, error) {
 		return nil, errors.New("DISCARD without MULTI")
 	}
 
-	state.isTxn = false
-	clear(state.queue)
+	HandleTxnEnd(state)
 
 	return RESPEncoder("OK", Simple), nil
 }
@@ -643,6 +655,17 @@ func (com *Com) watch(state *State) ([]byte, error) {
 		state.txn.watched = append(state.txn.watched, key)
 		watchers[key] = append(watchers[key], state.txn)
 	}
+
+	return RESPEncoder("OK", Simple), nil
+}
+
+func (com *Com) unwatch(state *State) ([]byte, error) {
+	kmu.Lock()
+	defer kmu.Unlock()
+
+	CleanupWatcher(state.txn, state.txn.watched)
+	state.txn.watched = []string{}
+	state.txn.dirty = false
 
 	return RESPEncoder("OK", Simple), nil
 }

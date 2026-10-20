@@ -47,7 +47,7 @@ func HandleConn(conn net.Conn) {
 		if err != nil {
 			out = RESPEncoder(err.Error(), SimpleErr)
 		} else {
-			if state.isTxn && com.Base != "exec" && com.Base != "multi" && com.Base != "discard" && com.Base != "watch" {
+			if state.isTxn && com.Base != "exec" && com.Base != "multi" && com.Base != "discard" && com.Base != "watch" && com.Base != "unwatch" {
 				state.queue = append(state.queue, com)
 				out = RESPEncoder("QUEUED", Simple)
 			} else {

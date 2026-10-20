@@ -65,6 +65,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateDiscard(args)
 	case "watch":
 		err = com.ValidateWatch(args)
+	case "unwatch":
+		err = com.ValidateUnwatch(args)
 	}
 
 	return com, err
@@ -110,6 +112,8 @@ func (com *Com) HandleCom(state *State) ([]byte, error) {
 		return com.discard(state)
 	case "watch":
 		return com.watch(state)
+	case "unwatch":
+		return com.unwatch(state)
 
 	default:
 		return nil, nil
@@ -390,5 +394,9 @@ func (com *Com) ValidateWatch(args []string) error {
 		return errors.New("Watch expects atleast one key to be passed as an argument")
 	}
 
+	return nil
+}
+
+func (com *Com) ValidateUnwatch(args []string) error {
 	return nil
 }
