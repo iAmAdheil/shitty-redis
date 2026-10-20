@@ -669,3 +669,8 @@ func (com *Com) unwatch(state *State) ([]byte, error) {
 
 	return RESPEncoder("OK", Simple), nil
 }
+
+func (com *Com) info() ([]byte, error) {
+	s := "role:master"
+	return RESPEncoder(s, Bulk), nil
+}

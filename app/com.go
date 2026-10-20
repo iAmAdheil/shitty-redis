@@ -67,6 +67,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateWatch(args)
 	case "unwatch":
 		err = com.ValidateUnwatch(args)
+	case "info":
+		err = com.ValidateInfo(args)
 	}
 
 	return com, err
@@ -114,6 +116,8 @@ func (com *Com) HandleCom(state *State) ([]byte, error) {
 		return com.watch(state)
 	case "unwatch":
 		return com.unwatch(state)
+	case "info":
+		return com.info()
 
 	default:
 		return nil, nil
@@ -398,5 +402,14 @@ func (com *Com) ValidateWatch(args []string) error {
 }
 
 func (com *Com) ValidateUnwatch(args []string) error {
+	return nil
+}
+
+func (com *Com) ValidateInfo(args []string) error {
+	if len(args) >= 1 {
+		// optional
+		com.Extras["replicate"] = []string{"_"}
+	}
+
 	return nil
 }
