@@ -14,6 +14,9 @@ import (
 
 const hangLimit = 2 * time.Second
 
+// HandleCom needs a server. None of these commands read it, so any config works.
+var testServer = NewServer(&Config{Port: "6379", Role: Master})
+
 type reply struct {
 	out      []byte
 	err      error
@@ -36,7 +39,7 @@ func run(base string, args ...string) (r reply) {
 		r.err = err
 		return r
 	}
-	r.out, r.err = com.HandleCom()
+	r.out, r.err = com.HandleCom(testServer, NewState())
 	return r
 }
 

@@ -597,7 +597,7 @@ func (com *Com) multi(state *State) ([]byte, error) {
 }
 
 // txn endpoint
-func (com *Com) exec(state *State) ([]byte, error) {
+func (com *Com) exec(server *Server, state *State) ([]byte, error) {
 	if !state.isTxn {
 		return nil, errors.New("EXEC without MULTI")
 	}
@@ -617,7 +617,7 @@ func (com *Com) exec(state *State) ([]byte, error) {
 	var res []string = []string{}
 
 	for _, com := range state.queue {
-		out, err := com.HandleCom(state)
+		out, err := com.HandleCom(server, state)
 		if err != nil {
 			e := RESPEncoder(err.Error(), SimpleErr)
 			res = append(res, string(e))
@@ -670,7 +670,7 @@ func (com *Com) unwatch(state *State) ([]byte, error) {
 	return RESPEncoder("OK", Simple), nil
 }
 
-func (com *Com) info() ([]byte, error) {
-	s := "role:master"
+func (com *Com) info(server *Server) ([]byte, error) {
+	s := "role:" + server.Role.String()
 	return RESPEncoder(s, Bulk), nil
 }

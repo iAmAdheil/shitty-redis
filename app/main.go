@@ -1,19 +1,18 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"net"
 	"os"
 )
 
 func main() {
-	port := flag.String("port", "6379", "port for redis server")
-	flag.Parse()
+	config := ExtractConfig()
+	server := NewServer(config)
 
-	l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", *port))
+	l, err := net.Listen("tcp", server.Address)
 	if err != nil {
-		fmt.Println("Failed to bind to port", *port)
+		fmt.Println("Failed to bind to port", config.Port)
 		fmt.Println("Error:", err.Error())
 		os.Exit(1)
 	}
@@ -25,11 +24,11 @@ func main() {
 			os.Exit(1)
 		}
 
-		go HandleConn(conn)
+		go HandleConn(server, conn)
 	}
 }
 
-func HandleConn(conn net.Conn) {
+func HandleConn(server *Server, conn net.Conn) {
 	state := NewState()
 
 	for {
@@ -56,7 +55,7 @@ func HandleConn(conn net.Conn) {
 				state.queue = append(state.queue, com)
 				out = RESPEncoder("QUEUED", Simple)
 			} else {
-				out, err = com.HandleCom(state)
+				out, err = com.HandleCom(server, state)
 				if err != nil {
 					out = RESPEncoder(err.Error(), SimpleErr)
 				}
