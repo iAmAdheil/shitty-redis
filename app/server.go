@@ -45,6 +45,8 @@ func ExtractConfig() *Config {
 type Server struct {
 	Address string
 	Role    Role
+	Id      string
+	Offset  int
 }
 
 func NewServer(c *Config) *Server {
@@ -53,5 +55,7 @@ func NewServer(c *Config) *Server {
 	return &Server{
 		Address: address,
 		Role:    c.Role,
+		Id:      "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
+		Offset:  0,
 	}
 }

@@ -671,6 +671,13 @@ func (com *Com) unwatch(state *State) ([]byte, error) {
 }
 
 func (com *Com) info(server *Server) ([]byte, error) {
-	s := "role:" + server.Role.String()
+	var s string
+	if server.Role == Master {
+		s = "role:" + server.Role.String() + "\n"
+		s += "master_replid:" + server.Id + "\n"
+		s += fmt.Sprintf("master_repl_offset:%d", server.Offset)
+	} else {
+		s = "role:" + server.Role.String()
+	}
 	return RESPEncoder(s, Bulk), nil
 }
