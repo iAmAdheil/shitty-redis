@@ -3,32 +3,17 @@ package main
 import (
 	"fmt"
 	"net"
-	"os"
+
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 func main() {
-	config := ExtractConfig()
-	server := NewServer(config)
-
-	l, err := net.Listen("tcp", server.Address)
-	if err != nil {
-		fmt.Println("Failed to bind to port", config.Port)
-		fmt.Println("Error:", err.Error())
-		os.Exit(1)
-	}
-
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			os.Exit(1)
-		}
-
-		go HandleConn(server, conn)
-	}
+	cfg := server.ExtractConfig()
+	srv := server.New(cfg)
+	srv.Start(HandleConn)
 }
 
-func HandleConn(server *Server, conn net.Conn) {
+func HandleConn(server *server.Server, conn net.Conn) {
 	state := NewState()
 
 	for {

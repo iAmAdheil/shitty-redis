@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 // Tests for the blocking commands: BLPOP and XREAD BLOCK.
@@ -15,7 +17,7 @@ import (
 const hangLimit = 2 * time.Second
 
 // HandleCom needs a server. None of these commands read it, so any config works.
-var testServer = NewServer(&Config{Port: "6379", Role: Master})
+var testServer = server.New(&server.Config{Port: "6379", Role: server.Master})
 
 type reply struct {
 	out      []byte

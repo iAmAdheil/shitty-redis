@@ -1,8 +1,7 @@
-package main
+package server
 
 import (
 	"flag"
-	"fmt"
 )
 
 type Role int
@@ -39,23 +38,5 @@ func ExtractConfig() *Config {
 	return &Config{
 		Port: *port,
 		Role: role,
-	}
-}
-
-type Server struct {
-	Address string
-	Role    Role
-	Id      string
-	Offset  int
-}
-
-func NewServer(c *Config) *Server {
-	address := fmt.Sprintf("0.0.0.0:%s", c.Port)
-
-	return &Server{
-		Address: address,
-		Role:    c.Role,
-		Id:      "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
-		Offset:  0,
 	}
 }

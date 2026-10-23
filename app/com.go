@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 // #D1 -> using []string as arg value for now. If it does not work out, go for any in the future
@@ -74,7 +76,7 @@ func GetCom(base string, args []string) (*Com, error) {
 	return com, err
 }
 
-func (com *Com) HandleCom(server *Server, state *State) ([]byte, error) {
+func (com *Com) HandleCom(server *server.Server, state *State) ([]byte, error) {
 	switch com.Base {
 	case "ping":
 		return com.ping()

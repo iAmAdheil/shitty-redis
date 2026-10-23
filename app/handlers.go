@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"github.com/codecrafters-io/redis-starter-go/app/structures/list"
 	"github.com/codecrafters-io/redis-starter-go/app/structures/stream"
 )
@@ -597,7 +598,7 @@ func (com *Com) multi(state *State) ([]byte, error) {
 }
 
 // txn endpoint
-func (com *Com) exec(server *Server, state *State) ([]byte, error) {
+func (com *Com) exec(server *server.Server, state *State) ([]byte, error) {
 	if !state.isTxn {
 		return nil, errors.New("EXEC without MULTI")
 	}
@@ -670,14 +671,15 @@ func (com *Com) unwatch(state *State) ([]byte, error) {
 	return RESPEncoder("OK", Simple), nil
 }
 
-func (com *Com) info(server *Server) ([]byte, error) {
+func (com *Com) info(srv *server.Server) ([]byte, error) {
 	var s string
-	if server.Role == Master {
-		s = "role:" + server.Role.String() + "\n"
-		s += "master_replid:" + server.Id + "\n"
-		s += fmt.Sprintf("master_repl_offset:%d", server.Offset)
+	m, ok := srv.IsMaster()
+	if ok {
+		s += "role:" + m.Role().String() + "\n"
+		s += "master_replid:" + m.Id() + "\n"
+		s += fmt.Sprintf("master_repl_offset:%d", m.Offset())
 	} else {
-		s = "role:" + server.Role.String()
+		s += "role:slave"
 	}
 	return RESPEncoder(s, Bulk), nil
 }
