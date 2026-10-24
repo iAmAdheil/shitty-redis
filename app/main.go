@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
@@ -27,22 +28,22 @@ func HandleConn(server *server.Server, conn net.Conn) {
 
 		var out []byte
 
-		base, args, err := RESPDecoder(in[:n])
+		base, args, err := resp.RESPDecoder(in[:n])
 		if err != nil {
 			// do something
 		}
 
 		com, err := GetCom(base, args)
 		if err != nil {
-			out = RESPEncoder(err.Error(), SimpleErr)
+			out = resp.RESPEncoder(err.Error(), resp.SimpleErr)
 		} else {
 			if state.isTxn && com.Base != "exec" && com.Base != "multi" && com.Base != "discard" && com.Base != "watch" && com.Base != "unwatch" {
 				state.queue = append(state.queue, com)
-				out = RESPEncoder("QUEUED", Simple)
+				out = resp.RESPEncoder("QUEUED", resp.Simple)
 			} else {
 				out, err = com.HandleCom(server, state)
 				if err != nil {
-					out = RESPEncoder(err.Error(), SimpleErr)
+					out = resp.RESPEncoder(err.Error(), resp.SimpleErr)
 				}
 			}
 		}

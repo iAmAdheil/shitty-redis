@@ -22,7 +22,7 @@ func New(c *Config) *Server {
 	if c.Role == Master {
 		repl = NewMaster()
 	} else if c.Role == Replica {
-		repl = NewReplica()
+		repl = NewReplica(c)
 	}
 
 	return &Server{
@@ -32,6 +32,14 @@ func New(c *Config) *Server {
 }
 
 func (srv *Server) Start(cb func(*Server, net.Conn)) {
+	r, ok := srv.IsReplica()
+	if ok {
+		err := r.Handshake()
+		if err != nil {
+			fmt.Printf("Err: %s\n", err.Error())
+		}
+	}
+
 	l, err := net.Listen("tcp", srv.Address)
 	if err != nil {
 		fmt.Println("Error:", err.Error())

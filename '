@@ -1,0 +1,31 @@
+package server
+
+import (
+	"net"
+	"time"
+)
+
+type ReplicaRepl struct {
+	MasterHost string
+	MasterPort string
+}
+
+func NewReplica(c *Config) *ReplicaRepl {
+	return &ReplicaRepl{
+		MasterHost: c.MasterHost,
+		MasterPort: c.MasterPort,
+	}
+}
+
+func (r *ReplicaRepl) Role() Role {
+	return Replica
+}
+
+func (r *ReplicaRepl) Handshake() error {
+	addr := r.MasterHost + ":" + r.MasterPort
+
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if 
+
+	return nil
+}

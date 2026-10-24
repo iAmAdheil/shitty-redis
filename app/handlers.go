@@ -8,17 +8,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"github.com/codecrafters-io/redis-starter-go/app/structures/list"
 	"github.com/codecrafters-io/redis-starter-go/app/structures/stream"
 )
 
 func (com *Com) ping() ([]byte, error) {
-	return RESPEncoder("PONG", Simple), nil
+	return resp.RESPEncoder("PONG", resp.Simple), nil
 }
 
 func (com *Com) echo() ([]byte, error) {
-	return RESPEncoder(com.Args["echothis"][0], Bulk), nil
+	return resp.RESPEncoder(com.Args["echothis"][0], resp.Bulk), nil
 }
 
 func (com *Com) handleType() ([]byte, error) {
@@ -31,15 +32,15 @@ func (com *Com) handleType() ([]byte, error) {
 	if ok {
 		switch e.Type {
 		case TypeVar:
-			return RESPEncoder("string", Simple), nil
+			return resp.RESPEncoder("string", resp.Simple), nil
 		case TypeList:
-			return RESPEncoder("list", Simple), nil
+			return resp.RESPEncoder("list", resp.Simple), nil
 		case TypeStream:
-			return RESPEncoder("stream", Simple), nil
+			return resp.RESPEncoder("stream", resp.Simple), nil
 		}
 	}
 
-	return RESPEncoder("none", Simple), nil
+	return resp.RESPEncoder("none", resp.Simple), nil
 }
 
 func (com *Com) get() ([]byte, error) {
@@ -51,7 +52,7 @@ func (com *Com) get() ([]byte, error) {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		return RESPEncoder(nil, NullBulk), nil
+		return resp.RESPEncoder(nil, resp.NullBulk), nil
 	}
 
 	v, ok := e.Data.(*string)
@@ -59,7 +60,7 @@ func (com *Com) get() ([]byte, error) {
 		// do something
 	}
 
-	return RESPEncoder(*v, Bulk), nil
+	return resp.RESPEncoder(*v, resp.Bulk), nil
 }
 
 func (com *Com) set() ([]byte, error) {
@@ -81,7 +82,7 @@ func (com *Com) set() ([]byte, error) {
 		}
 	}
 
-	return RESPEncoder("OK", Simple), nil
+	return resp.RESPEncoder("OK", resp.Simple), nil
 }
 
 func (com *Com) rpush() ([]byte, error) {
@@ -112,7 +113,7 @@ func (com *Com) rpush() ([]byte, error) {
 		DeleteStructure(key)
 	}
 
-	return RESPEncoder(len, Int), nil
+	return resp.RESPEncoder(len, resp.Int), nil
 }
 
 func (com *Com) lrange() ([]byte, error) {
@@ -137,7 +138,7 @@ func (com *Com) lrange() ([]byte, error) {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		return RESPEncoder(elements, BulkList), nil
+		return resp.RESPEncoder(elements, resp.BulkList), nil
 	}
 
 	lp, ok := e.Data.(*list.List)
@@ -147,7 +148,7 @@ func (com *Com) lrange() ([]byte, error) {
 
 	elements = lp.LRANGE(l, r)
 
-	return RESPEncoder(elements, BulkList), nil
+	return resp.RESPEncoder(elements, resp.BulkList), nil
 }
 
 func (com *Com) lpush() ([]byte, error) {
@@ -177,7 +178,7 @@ func (com *Com) lpush() ([]byte, error) {
 		DeleteStructure(key)
 	}
 
-	return RESPEncoder(len, Int), nil
+	return resp.RESPEncoder(len, resp.Int), nil
 }
 
 func (com *Com) llen() ([]byte, error) {
@@ -189,7 +190,7 @@ func (com *Com) llen() ([]byte, error) {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		return RESPEncoder(0, Int), nil
+		return resp.RESPEncoder(0, resp.Int), nil
 	}
 
 	lp, ok := e.Data.(*list.List)
@@ -197,7 +198,7 @@ func (com *Com) llen() ([]byte, error) {
 		// do something
 	}
 
-	return RESPEncoder(lp.LLEN(), Int), nil
+	return resp.RESPEncoder(lp.LLEN(), resp.Int), nil
 }
 
 func (com *Com) lpop() ([]byte, error) {
@@ -215,7 +216,7 @@ func (com *Com) lpop() ([]byte, error) {
 	e, ok := keyspace[key]
 	// DNE
 	if !ok {
-		return RESPEncoder(nil, NullBulk), nil
+		return resp.RESPEncoder(nil, resp.NullBulk), nil
 	}
 
 	lp, ok := e.Data.(*list.List)
@@ -231,13 +232,13 @@ func (com *Com) lpop() ([]byte, error) {
 	}
 
 	if len(out) == 0 {
-		return RESPEncoder(nil, NullBulk), nil
+		return resp.RESPEncoder(nil, resp.NullBulk), nil
 	} else if len(out) > 1 {
 		// bulk list
-		return RESPEncoder(out, BulkList), nil
+		return resp.RESPEncoder(out, resp.BulkList), nil
 	}
 	// len = 1 -> single element popped -> bulk string
-	return RESPEncoder(out[0], Bulk), nil
+	return resp.RESPEncoder(out[0], resp.Bulk), nil
 }
 
 func (com *Com) blpop() ([]byte, error) {
@@ -270,7 +271,7 @@ func (com *Com) blpop() ([]byte, error) {
 		if lp.LLEN() > 0 {
 			element := lp.LPOP(1)
 			out = append(out, element...)
-			res = RESPEncoder(out, BulkList)
+			res = resp.RESPEncoder(out, resp.BulkList)
 		} else {
 			ch = make(chan string, 1)
 			blpopWaiters[key] = append(blpopWaiters[key], ch)
@@ -292,7 +293,7 @@ func (com *Com) blpop() ([]byte, error) {
 	select {
 	case pop := <-ch:
 		out = append(out, pop)
-		res = RESPEncoder(out, BulkList)
+		res = resp.RESPEncoder(out, resp.BulkList)
 
 	// after acquiring lock if channel found and popped -> return -1
 	// else value has been passed into channel -> process and return value
@@ -303,12 +304,12 @@ func (com *Com) blpop() ([]byte, error) {
 		isExists := findAndPopCh(ch, key, com.Base)
 		// channel popped from the list, no value pushed
 		if isExists {
-			res = RESPEncoder(nil, NullBulkList)
+			res = resp.RESPEncoder(nil, resp.NullBulkList)
 		} else {
 			// false -> chan was filled just before timeout -> process and return happy path
 			pop := <-ch
 			out = append(out, pop)
-			res = RESPEncoder(out, BulkList)
+			res = resp.RESPEncoder(out, resp.BulkList)
 		}
 	}
 
@@ -354,7 +355,7 @@ func (com *Com) xadd() ([]byte, error) {
 
 	WakeAllXREADListeners(key)
 
-	return RESPEncoder(id, Bulk), nil
+	return resp.RESPEncoder(id, resp.Bulk), nil
 }
 
 func (com *Com) xrange() ([]byte, error) {
@@ -381,7 +382,7 @@ func (com *Com) xrange() ([]byte, error) {
 		return nil, errors.New("XRANGE failed")
 	}
 
-	return RESPEncoder(entries, Array), nil
+	return resp.RESPEncoder(entries, resp.Array), nil
 }
 
 func (com *Com) xread() ([]byte, error) {
@@ -436,9 +437,9 @@ func (com *Com) xread() ([]byte, error) {
 	if len(res) > 0 || !ok {
 		kmu.Unlock() // unlock before return
 		if len(res) == 0 {
-			return RESPEncoder(nil, NullBulkList), nil
+			return resp.RESPEncoder(nil, resp.NullBulkList), nil
 		}
-		return RESPEncoder(res, Array), nil
+		return resp.RESPEncoder(res, resp.Array), nil
 	}
 	// blocking path
 	ch := make(chan string, 1)
@@ -507,7 +508,7 @@ func (com *Com) xread() ([]byte, error) {
 			findAndPopChFromKeys(keys, ch, com.Base)
 			kmu.Unlock()
 
-			return RESPEncoder(res, Array), nil
+			return resp.RESPEncoder(res, resp.Array), nil
 
 		case <-expch:
 			kmu.Lock()
@@ -545,12 +546,12 @@ func (com *Com) xread() ([]byte, error) {
 				}
 
 				if len(res) == 0 {
-					return RESPEncoder(nil, NullBulkList), nil
+					return resp.RESPEncoder(nil, resp.NullBulkList), nil
 				}
-				return RESPEncoder(res, Array), nil
+				return resp.RESPEncoder(res, resp.Array), nil
 
 			default: // null ch
-				return RESPEncoder(nil, NullBulkList), nil
+				return resp.RESPEncoder(nil, resp.NullBulkList), nil
 			}
 		}
 	}
@@ -566,7 +567,7 @@ func (com *Com) incr() ([]byte, error) {
 	if !ok {
 		val := "1"
 		keyspace[key] = NewStructure(TypeVar, &val)
-		return RESPEncoder(1, Int), nil
+		return resp.RESPEncoder(1, resp.Int), nil
 	}
 
 	v, ok := e.Data.(*string)
@@ -585,7 +586,7 @@ func (com *Com) incr() ([]byte, error) {
 
 	val++
 	*v = strconv.FormatInt(val, 10)
-	return RESPEncoder(int(val), Int), nil
+	return resp.RESPEncoder(int(val), resp.Int), nil
 }
 
 // isTxn is a per connection field
@@ -594,7 +595,7 @@ func (com *Com) multi(state *State) ([]byte, error) {
 		return nil, errors.New("MULTI calls can not be nested")
 	}
 	state.isTxn = true
-	return RESPEncoder("OK", Simple), nil
+	return resp.RESPEncoder("OK", resp.Simple), nil
 }
 
 // txn endpoint
@@ -611,7 +612,7 @@ func (com *Com) exec(server *server.Server, state *State) ([]byte, error) {
 	if state.txn.dirty {
 		HandleTxnEnd(state)
 		kmu.Unlock()
-		return RESPEncoder(nil, NullBulkList), nil
+		return resp.RESPEncoder(nil, resp.NullBulkList), nil
 	}
 	kmu.Unlock()
 
@@ -620,7 +621,7 @@ func (com *Com) exec(server *server.Server, state *State) ([]byte, error) {
 	for _, com := range state.queue {
 		out, err := com.HandleCom(server, state)
 		if err != nil {
-			e := RESPEncoder(err.Error(), SimpleErr)
+			e := resp.RESPEncoder(err.Error(), resp.SimpleErr)
 			res = append(res, string(e))
 		} else {
 			res = append(res, string(out))
@@ -631,7 +632,7 @@ func (com *Com) exec(server *server.Server, state *State) ([]byte, error) {
 	HandleTxnEnd(state)
 	kmu.Unlock()
 
-	return RESPEncoder(res, Array), nil
+	return resp.RESPEncoder(res, resp.Array), nil
 }
 
 func (com *Com) discard(state *State) ([]byte, error) {
@@ -641,7 +642,7 @@ func (com *Com) discard(state *State) ([]byte, error) {
 
 	HandleTxnEnd(state)
 
-	return RESPEncoder("OK", Simple), nil
+	return resp.RESPEncoder("OK", resp.Simple), nil
 }
 
 func (com *Com) watch(state *State) ([]byte, error) {
@@ -657,7 +658,7 @@ func (com *Com) watch(state *State) ([]byte, error) {
 		watchers[key] = append(watchers[key], state.txn)
 	}
 
-	return RESPEncoder("OK", Simple), nil
+	return resp.RESPEncoder("OK", resp.Simple), nil
 }
 
 func (com *Com) unwatch(state *State) ([]byte, error) {
@@ -668,7 +669,7 @@ func (com *Com) unwatch(state *State) ([]byte, error) {
 	state.txn.watched = []string{}
 	state.txn.dirty = false
 
-	return RESPEncoder("OK", Simple), nil
+	return resp.RESPEncoder("OK", resp.Simple), nil
 }
 
 func (com *Com) info(srv *server.Server) ([]byte, error) {
@@ -681,5 +682,5 @@ func (com *Com) info(srv *server.Server) ([]byte, error) {
 	} else {
 		s += "role:slave"
 	}
-	return RESPEncoder(s, Bulk), nil
+	return resp.RESPEncoder(s, resp.Bulk), nil
 }

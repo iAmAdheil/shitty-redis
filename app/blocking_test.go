@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
@@ -96,7 +97,7 @@ func keyExists(key string) bool {
 	return ok
 }
 
-var nullList = RESPEncoder(nil, NullBulkList)
+var nullList = resp.RESPEncoder(nil, resp.NullBulkList)
 
 // ---------- BLPOP ----------
 

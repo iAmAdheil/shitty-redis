@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"flag"
+	"strings"
 )
 
 type Role int
@@ -21,8 +23,10 @@ func (r Role) String() string {
 }
 
 type Config struct {
-	Port string
-	Role Role
+	Port       string
+	Role       Role
+	MasterHost string
+	MasterPort string
 }
 
 func ExtractConfig() *Config {
@@ -30,13 +34,28 @@ func ExtractConfig() *Config {
 	replicaof := flag.String("replicaof", "", "server's role, as a replica or master")
 	flag.Parse()
 
-	var role Role = Master
-	if len(*replicaof) > 0 {
-		role = Replica
+	cfg := &Config{
+		Port: *port,
 	}
 
-	return &Config{
-		Port: *port,
-		Role: role,
+	cfg.Role = Master
+	if len(*replicaof) > 0 {
+		cfg.Role = Replica
+		cfg.ReplCfg(*replicaof)
 	}
+
+	return cfg
+}
+
+func (cfg *Config) ReplCfg(mc string) error {
+	s := strings.Split(mc, " ")
+	if len(s) <= 1 {
+		return errors.New("Invalid master connection configuration")
+	}
+
+	h, p := s[0], s[1]
+	cfg.MasterHost = h
+	cfg.MasterPort = p
+
+	return nil
 }
