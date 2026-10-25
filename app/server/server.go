@@ -1,9 +1,13 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 )
 
 type Replication interface {
@@ -11,6 +15,7 @@ type Replication interface {
 }
 
 type Server struct {
+	Port    string
 	Address string
 	Repl    Replication
 }
@@ -26,17 +31,18 @@ func New(c *Config) *Server {
 	}
 
 	return &Server{
+		Port:    c.Port,
 		Address: address,
 		Repl:    repl,
 	}
 }
 
 func (srv *Server) Start(cb func(*Server, net.Conn)) {
-	r, ok := srv.IsReplica()
+	_, ok := srv.IsReplica()
 	if ok {
-		err := r.Handshake()
+		err := srv.Handshake()
 		if err != nil {
-			fmt.Printf("Err: %s\n", err.Error())
+			fmt.Printf("Handshake Err: %s\n", err.Error())
 		}
 	}
 
@@ -71,4 +77,56 @@ func (srv *Server) IsReplica() (*ReplicaRepl, bool) {
 		return nil, false
 	}
 	return m, true
+}
+
+func (srv *Server) Handshake() error {
+	r, ok := srv.IsReplica()
+	if r == nil || !ok {
+		return errors.New("Not a replica")
+	}
+
+	addr := r.MasterHost + ":" + r.MasterPort
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	req := resp.RESPEncoder([]string{"PING"}, resp.BulkList)
+	n, err := conn.Write(req)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%d bytes written to the master node, waiting for a response\n", n)
+
+	res := make([]byte, 1024)
+	n, err = conn.Read(res)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%d bytes received from the master node\n", n)
+
+	r1 := resp.RESPEncoder([]string{"REPLCONF", "listening-port", srv.Port}, resp.BulkList)
+	r2 := resp.RESPEncoder([]string{"REPLCONF", "capa", "psync2"}, resp.BulkList)
+
+	_, err = conn.Write(r1)
+	if err != nil {
+		return err
+	}
+	fmt.Println("REPLCONF part 1 sent to the master node")
+
+	_, err = conn.Write(r2)
+	if err != nil {
+		return err
+	}
+	fmt.Println("REPLCONF part 2 sent to the master node")
+	r2res := make([]byte, 1024)
+	n, err = conn.Read(r2res)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
