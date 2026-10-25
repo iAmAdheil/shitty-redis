@@ -59,13 +59,26 @@ func HandleConn(server *server.Server, conn net.Conn) {
 			continue
 		}
 
-		if com.Base == "psync" {
+		// propogation
+		m, ok := server.IsMaster()
+		if ok && (com.Base == "set") {
+			for _, c := range m.ReplConnections {
+				c.Write(resp.RESPEncoder(append([]string{base}, args...), resp.BulkList))
+			}
+		}
+
+		m, ok = server.IsMaster()
+		if ok && com.Base == "psync" {
 			e := rdb.EmptyRDB()
 			header := []byte(fmt.Sprintf("$%d\r\n", len(e)))
 
 			if _, err := conn.Write(append(header, e...)); err != nil {
 				fmt.Printf("RDB transfer (PSYNC) failure for replica address: %s\n", conn.RemoteAddr().String())
 				continue
+			}
+
+			if ok {
+				m.ReplConnections = append(m.ReplConnections, conn)
 			}
 		}
 	}

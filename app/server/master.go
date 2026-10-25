@@ -1,8 +1,11 @@
 package server
 
+import "net"
+
 type MasterRepl struct {
-	id     string
-	offset int
+	id              string
+	offset          int
+	ReplConnections []net.Conn
 }
 
 func NewMaster() *MasterRepl {
