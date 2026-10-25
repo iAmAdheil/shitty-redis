@@ -73,6 +73,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateInfo(args)
 	case "replconf":
 		err = com.ValidateReplconf(args)
+	case "psync":
+		err = com.ValidatePSync(args)
 	}
 
 	return com, err
@@ -124,6 +126,8 @@ func (com *Com) HandleCom(server *server.Server, state *State) ([]byte, error) {
 		return com.info(server)
 	case "replconf":
 		return com.replconf()
+	case "psync":
+		return com.psync(server)
 
 	default:
 		return nil, nil
@@ -421,5 +425,9 @@ func (com *Com) ValidateInfo(args []string) error {
 }
 
 func (com *Com) ValidateReplconf(args []string) error {
+	return nil
+}
+
+func (com *Com) ValidatePSync(args []string) error {
 	return nil
 }
