@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	rdb "github.com/codecrafters-io/redis-starter-go/app/RDB"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
@@ -55,6 +56,17 @@ func HandleConn(server *server.Server, conn net.Conn) {
 
 		if _, err := conn.Write(out); err != nil {
 			fmt.Printf("Error writing into connection: %s\n", err.Error())
+			continue
+		}
+
+		if com.Base == "psync" {
+			e := rdb.EmptyRDB()
+			header := []byte(fmt.Sprintf("$%d\r\n", len(e)))
+
+			if _, err := conn.Write(append(header, e...)); err != nil {
+				fmt.Printf("RDB transfer (PSYNC) failure for replica address: %s\n", conn.RemoteAddr().String())
+				continue
+			}
 		}
 	}
 }

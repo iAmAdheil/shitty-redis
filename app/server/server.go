@@ -135,7 +135,7 @@ func (srv *Server) Handshake() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("REPLCONF part 1 response:", string(r2res))
+	fmt.Println("REPLCONF part 2 response:", string(r2res))
 
 	sync := resp.RESPEncoder([]string{"PSYNC", "?", "-1"}, resp.BulkList)
 	n, err = conn.Write(sync)
