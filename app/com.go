@@ -71,6 +71,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateUnwatch(args)
 	case "info":
 		err = com.ValidateInfo(args)
+	case "replconf":
+		err = com.ValidateReplconf(args)
 	}
 
 	return com, err
@@ -120,6 +122,8 @@ func (com *Com) HandleCom(server *server.Server, state *State) ([]byte, error) {
 		return com.unwatch(state)
 	case "info":
 		return com.info(server)
+	case "replconf":
+		return com.replconf()
 
 	default:
 		return nil, nil
@@ -413,5 +417,9 @@ func (com *Com) ValidateInfo(args []string) error {
 		com.Extras["replicate"] = []string{"_"}
 	}
 
+	return nil
+}
+
+func (com *Com) ValidateReplconf(args []string) error {
 	return nil
 }
