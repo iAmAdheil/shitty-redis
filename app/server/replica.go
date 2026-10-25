@@ -1,8 +1,10 @@
 package server
 
 type ReplicaRepl struct {
-	MasterHost string
-	MasterPort string
+	MasterHost   string
+	MasterPort   string
+	MasterId     string
+	MasterOffset int
 }
 
 func NewReplica(c *Config) *ReplicaRepl {

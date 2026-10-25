@@ -117,13 +117,35 @@ func (srv *Server) Handshake() error {
 	}
 	fmt.Println("REPLCONF part 1 sent to the master node")
 
+	r1res := make([]byte, 1024)
+	n, err = conn.Read(r1res)
+	if err != nil {
+		return err
+	}
+	fmt.Println("REPLCONF part 1 response:", string(r1res))
+
 	_, err = conn.Write(r2)
 	if err != nil {
 		return err
 	}
 	fmt.Println("REPLCONF part 2 sent to the master node")
+
 	r2res := make([]byte, 1024)
 	n, err = conn.Read(r2res)
+	if err != nil {
+		return err
+	}
+	fmt.Println("REPLCONF part 1 response:", string(r2res))
+
+	sync := resp.RESPEncoder([]string{"PSYNC", "?", "-1"}, resp.BulkList)
+	n, err = conn.Write(sync)
+	if err != nil {
+		return err
+	}
+	fmt.Println("PSYNC sent to the master node")
+
+	syncres := make([]byte, 1024)
+	n, err = conn.Read(syncres)
 	if err != nil {
 		return err
 	}
