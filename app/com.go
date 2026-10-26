@@ -125,7 +125,7 @@ func (com *Com) HandleCom(server *server.Server, state *State) ([]byte, error) {
 	case "info":
 		return com.info(server)
 	case "replconf":
-		return com.replconf()
+		return com.replconf(server)
 	case "psync":
 		return com.psync(server)
 
@@ -425,6 +425,9 @@ func (com *Com) ValidateInfo(args []string) error {
 }
 
 func (com *Com) ValidateReplconf(args []string) error {
+	if len(args) >= 1 && strings.ToLower(args[0]) == "getack" {
+		com.Extras["ack"] = []string{}
+	}
 	return nil
 }
 
