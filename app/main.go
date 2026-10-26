@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 
@@ -15,24 +16,17 @@ func main() {
 	srv.Start(HandleConn)
 }
 
-func HandleConn(server *server.Server, conn net.Conn) {
+func HandleConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 	state := NewState()
 
 	for {
-		in := make([]byte, 1000)
-
-		n, err := conn.Read(in)
-		if err != nil {
-			fmt.Printf("Error reading from connection: %s\n", err.Error())
-			break
-		}
-
 		var out []byte
 
-		base, args, err := resp.RESPDecoder(in[:n])
+		base, args, err := resp.RESPDecoder(r)
 		if err != nil {
-			// do something
+			break
 		}
+		fmt.Printf("Received %s\n", base)
 
 		com, err := GetCom(base, args)
 		if err != nil {
@@ -43,6 +37,7 @@ func HandleConn(server *server.Server, conn net.Conn) {
 				out = resp.RESPEncoder("QUEUED", resp.Simple)
 			} else {
 				out, err = com.HandleCom(server, state)
+
 				if err != nil {
 					out = resp.RESPEncoder(err.Error(), resp.SimpleErr)
 				}
@@ -54,12 +49,22 @@ func HandleConn(server *server.Server, conn net.Conn) {
 		// 	fmt.Printf("%q\n", v)
 		// }
 
+		// if update req from master, and replica -> no response
+		// runs inside go routine spawned for master-replica conn
+		r, ok := server.IsReplica()
+		if ok {
+			mAddr := r.MasterHost + ":" + r.MasterPort
+			if mAddr == conn.RemoteAddr().String() {
+				continue
+			}
+		}
+
 		if _, err := conn.Write(out); err != nil {
 			fmt.Printf("Error writing into connection: %s\n", err.Error())
 			continue
 		}
 
-		// propogation
+		// propogation from master
 		m, ok := server.IsMaster()
 		if ok && (com.Base == "set") {
 			for _, c := range m.ReplConnections {
@@ -67,7 +72,6 @@ func HandleConn(server *server.Server, conn net.Conn) {
 			}
 		}
 
-		m, ok = server.IsMaster()
 		if ok && com.Base == "psync" {
 			e := rdb.EmptyRDB()
 			header := []byte(fmt.Sprintf("$%d\r\n", len(e)))

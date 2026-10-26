@@ -1,10 +1,13 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
@@ -37,13 +40,14 @@ func New(c *Config) *Server {
 	}
 }
 
-func (srv *Server) Start(cb func(*Server, net.Conn)) {
+func (srv *Server) Start(cb func(*Server, net.Conn, *bufio.Reader)) {
 	_, ok := srv.IsReplica()
 	if ok {
-		err := srv.Handshake()
+		c, r, err := srv.Handshake()
 		if err != nil {
 			fmt.Printf("Handshake Err: %s\n", err.Error())
 		}
+		go cb(srv, c, r)
 	}
 
 	l, err := net.Listen("tcp", srv.Address)
@@ -59,7 +63,9 @@ func (srv *Server) Start(cb func(*Server, net.Conn)) {
 			os.Exit(1)
 		}
 
-		go cb(srv, conn)
+		r := bufio.NewReader(conn)
+
+		go cb(srv, conn, r)
 	}
 }
 
@@ -79,31 +85,31 @@ func (srv *Server) IsReplica() (*ReplicaRepl, bool) {
 	return m, true
 }
 
-func (srv *Server) Handshake() error {
+func (srv *Server) Handshake() (net.Conn, *bufio.Reader, error) {
 	r, ok := srv.IsReplica()
 	if r == nil || !ok {
-		return errors.New("Not a replica")
+		return nil, nil, errors.New("Not a replica")
 	}
 
 	addr := r.MasterHost + ":" + r.MasterPort
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	defer conn.Close()
 
+	reader := bufio.NewReader(conn)
 	req := resp.RESPEncoder([]string{"PING"}, resp.BulkList)
 	n, err := conn.Write(req)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	fmt.Printf("%d bytes written to the master node, waiting for a response\n", n)
 
 	res := make([]byte, 1024)
-	n, err = conn.Read(res)
+	n, err = reader.Read(res)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	fmt.Printf("%d bytes received from the master node\n", n)
@@ -113,42 +119,58 @@ func (srv *Server) Handshake() error {
 
 	_, err = conn.Write(r1)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	fmt.Println("REPLCONF part 1 sent to the master node")
 
 	r1res := make([]byte, 1024)
-	n, err = conn.Read(r1res)
+	n, err = reader.Read(r1res)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	fmt.Println("REPLCONF part 1 response:", string(r1res))
 
 	_, err = conn.Write(r2)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	fmt.Println("REPLCONF part 2 sent to the master node")
 
 	r2res := make([]byte, 1024)
-	n, err = conn.Read(r2res)
+	n, err = reader.Read(r2res)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	fmt.Println("REPLCONF part 2 response:", string(r2res))
 
 	sync := resp.RESPEncoder([]string{"PSYNC", "?", "-1"}, resp.BulkList)
 	n, err = conn.Write(sync)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	fmt.Println("PSYNC sent to the master node")
 
-	syncres := make([]byte, 1024)
-	n, err = conn.Read(syncres)
+	syncres, err := reader.ReadBytes('\n')
 	if err != nil {
-		return err
+		return nil, nil, err
+	}
+	fmt.Printf("PSYNC response: %s\n", syncres)
+
+	// wait for rdb after psync
+	bcs, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, nil, err
+	}
+	bcs = string(bytes.TrimSpace([]byte(bcs)))
+	bc, err := strconv.Atoi(bcs[1:])
+	if err != nil {
+		return nil, nil, err
+	}
+	rdb := make([]byte, bc)
+	_, err = reader.Read(rdb)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return nil
+	return conn, reader, nil
 }

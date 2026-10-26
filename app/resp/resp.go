@@ -10,12 +10,9 @@ import (
 	"strings"
 )
 
-func RESPDecoder(in []byte) (string, []string, error) {
+func RESPDecoder(reader *bufio.Reader) (string, []string, error) {
 	// print incoming bytes -> testing
 	// fmt.Printf("%q\n", in[:n])
-
-	r := bytes.NewReader(in)
-	reader := bufio.NewReader(r)
 
 	line, err := reader.ReadString('\n')
 	if err != nil {
