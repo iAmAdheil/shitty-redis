@@ -1,11 +1,15 @@
 package server
 
-import "net"
+import (
+	"net"
+	"sync"
+)
 
 type MasterRepl struct {
 	id              string
+	replConnections []net.Conn
 	offset          int
-	ReplConnections []net.Conn
+	mu              *sync.Mutex
 }
 
 func NewMaster() *MasterRepl {
@@ -25,4 +29,24 @@ func (m *MasterRepl) Id() string {
 
 func (m *MasterRepl) Offset() int {
 	return m.offset
+}
+
+func (m *MasterRepl) IncrOffset(v int) {
+	m.mu.Lock()
+	m.offset += v
+	m.mu.Unlock()
+}
+
+func (m *MasterRepl) Broadcast(b []byte) error {
+	return nil
+}
+
+func (m *MasterRepl) GetConnCount() int {
+	return len(m.replConnections)
+}
+
+func (m *MasterRepl) AddConn(conn net.Conn) {
+	m.mu.Lock()
+	m.replConnections = append(m.replConnections, conn)
+	m.mu.Unlock()
 }

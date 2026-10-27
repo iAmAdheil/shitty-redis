@@ -42,5 +42,5 @@ func (com *Com) wait(srv *server.Server) ([]byte, error) {
 		return nil, errors.New("Not the master node")
 	}
 
-	return resp.RESPEncoder(len(m.ReplConnections), resp.Int), nil
+	return resp.RESPEncoder(m.GetConnCount(), resp.Int), nil
 }

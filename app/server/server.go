@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
@@ -150,11 +151,20 @@ func (srv *Server) Handshake() (net.Conn, *bufio.Reader, error) {
 	}
 	fmt.Println("PSYNC sent to the master node")
 
-	syncres, err := reader.ReadBytes('\n')
+	syncres, err := reader.ReadString('\n')
 	if err != nil {
 		return nil, nil, err
 	}
 	fmt.Printf("PSYNC response: %s\n", syncres)
+	// extract replica offset from the response
+	syncres = string(bytes.TrimSpace([]byte(syncres)))
+	os := strings.Split(syncres, " ")[2]
+	offset, err := strconv.Atoi(os)
+	if err != nil {
+		return nil, nil, err
+	}
+	// update replica -> starting offset
+	r.MasterOffset = offset
 
 	// wait for rdb after psync
 	bcs, err := reader.ReadString('\n')

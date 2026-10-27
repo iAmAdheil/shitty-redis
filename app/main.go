@@ -16,7 +16,7 @@ func main() {
 	srv.Start(HandleClientConn, HandleReplConn)
 }
 
-// clients, replicas -> func handles both for the master
+// Handles every connection, that "HandleReplicaConn" does not
 func HandleClientConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 	state := NewState()
 
@@ -58,9 +58,9 @@ func HandleClientConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 		// propogation from master
 		m, ok := server.IsMaster()
 		if ok && (com.Base == "set") {
-			for _, c := range m.ReplConnections {
-				c.Write(resp.RESPEncoder(append([]string{base}, args...), resp.BulkList))
-			}
+			b := resp.RESPEncoder(append([]string{base}, args...), resp.BulkList)
+			m.IncrOffset(len(b))
+			m.Broadcast(b)
 		}
 
 		if ok && com.Base == "psync" {
@@ -73,13 +73,13 @@ func HandleClientConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 			}
 
 			if ok {
-				m.ReplConnections = append(m.ReplConnections, conn)
+				m.AddConn(conn)
 			}
 		}
 	}
 }
 
-// only handles the replica connection to the master
+// Only handles incoming bytes for a replica's connection to its master
 func HandleReplConn(server *server.Server, conn net.Conn, reader *bufio.Reader) {
 	state := NewState()
 
