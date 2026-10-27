@@ -40,14 +40,14 @@ func New(c *Config) *Server {
 	}
 }
 
-func (srv *Server) Start(cb func(*Server, net.Conn, *bufio.Reader)) {
+func (srv *Server) Start(clientCb func(*Server, net.Conn, *bufio.Reader), replCb func(*Server, net.Conn, *bufio.Reader)) {
 	_, ok := srv.IsReplica()
 	if ok {
 		c, r, err := srv.Handshake()
 		if err != nil {
 			fmt.Printf("Handshake Err: %s\n", err.Error())
 		}
-		go cb(srv, c, r)
+		go replCb(srv, c, r)
 	}
 
 	l, err := net.Listen("tcp", srv.Address)
@@ -65,7 +65,7 @@ func (srv *Server) Start(cb func(*Server, net.Conn, *bufio.Reader)) {
 
 		r := bufio.NewReader(conn)
 
-		go cb(srv, conn, r)
+		go clientCb(srv, conn, r)
 	}
 }
 

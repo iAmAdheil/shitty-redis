@@ -13,16 +13,17 @@ import (
 func main() {
 	cfg := server.ExtractConfig()
 	srv := server.New(cfg)
-	srv.Start(HandleConn)
+	srv.Start(HandleClientConn, HandleReplConn)
 }
 
-func HandleConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
+// clients, replicas -> func handles both for the master
+func HandleClientConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 	state := NewState()
 
 	for {
 		var out []byte
 
-		base, args, err := resp.RESPDecoder(r)
+		base, args, _, err := resp.RESPDecoder(r)
 		if err != nil {
 			break
 		}
@@ -49,16 +50,6 @@ func HandleConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 		// 	fmt.Printf("%q\n", v)
 		// }
 
-		// if update req from master, and replica -> no response
-		// runs inside go routine spawned for master-replica conn
-		r, ok := server.IsReplica()
-		if ok {
-			mAddr := r.MasterHost + ":" + r.MasterPort
-			if mAddr == conn.RemoteAddr().String() {
-				continue
-			}
-		}
-
 		if _, err := conn.Write(out); err != nil {
 			fmt.Printf("Error writing into connection: %s\n", err.Error())
 			continue
@@ -84,6 +75,58 @@ func HandleConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 			if ok {
 				m.ReplConnections = append(m.ReplConnections, conn)
 			}
+		}
+	}
+}
+
+// only handles the replica connection to the master
+func HandleReplConn(server *server.Server, conn net.Conn, reader *bufio.Reader) {
+	state := NewState()
+
+	for {
+		r, ok := server.IsReplica()
+		if !ok {
+			fmt.Printf("Not a replica, close connection")
+			conn.Close()
+			break
+		}
+
+		var out []byte
+
+		base, args, bc, err := resp.RESPDecoder(reader)
+		if err != nil {
+			break
+		}
+		fmt.Printf("Received %s\n", base)
+
+		com, err := GetCom(base, args)
+		if err != nil {
+			out = resp.RESPEncoder(err.Error(), resp.SimpleErr)
+		} else {
+			if state.isTxn && com.Base != "exec" && com.Base != "multi" && com.Base != "discard" && com.Base != "watch" && com.Base != "unwatch" {
+				state.queue = append(state.queue, com)
+				out = resp.RESPEncoder("QUEUED", resp.Simple)
+			} else {
+				out, err = com.HandleCom(server, state)
+
+				if err != nil {
+					out = resp.RESPEncoder(err.Error(), resp.SimpleErr)
+				}
+			}
+		}
+
+		// update offset once command execution complete -> ack
+		r.MasterOffset += bc
+
+		// if update req from master, and replica -> no response
+		// runs inside go routine spawned for master-replica conn
+		if base != "replconf" {
+			continue
+		}
+
+		if _, err := conn.Write(out); err != nil {
+			fmt.Printf("Error writing into connection: %s\n", err.Error())
+			continue
 		}
 	}
 }

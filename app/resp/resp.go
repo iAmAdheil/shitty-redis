@@ -10,24 +10,24 @@ import (
 	"strings"
 )
 
-func RESPDecoder(reader *bufio.Reader) (string, []string, error) {
-	// print incoming bytes -> testing
-	// fmt.Printf("%q\n", in[:n])
-
+// RESPDecoder reads one command from the reader. It returns the lowercased
+// command name, its arguments, and the number of bytes the command used on the wire.
+func RESPDecoder(reader *bufio.Reader) (string, []string, int, error) {
 	line, err := reader.ReadString('\n')
 	if err != nil {
-		return "", []string{}, fmt.Errorf("error: Invalid argument length")
+		return "", []string{}, 0, fmt.Errorf("error: Invalid argument length")
 	}
+	count := len(line)
 
 	line = string(bytes.TrimSpace([]byte(line)))
 	if len(line) == 0 || line[0] != '*' {
-		return "", []string{}, fmt.Errorf("expected array, got: %s", line)
+		return "", []string{}, 0, fmt.Errorf("expected array, got: %s", line)
 	}
 
 	// Parse number of elements in the array
 	numElements, err := strconv.Atoi(line[1:])
 	if err != nil {
-		return "", []string{}, fmt.Errorf("invalid array length: %s", err.Error())
+		return "", []string{}, 0, fmt.Errorf("invalid array length: %s", err.Error())
 	}
 
 	var base string
@@ -37,18 +37,19 @@ func RESPDecoder(reader *bufio.Reader) (string, []string, error) {
 		// Read the bulk string header line (e.g., "$4")
 		header, err := reader.ReadString('\n')
 		if err != nil {
-			return "", []string{}, fmt.Errorf("error: %s\n", err.Error())
+			return "", []string{}, 0, fmt.Errorf("error: %s\n", err.Error())
 		}
+		count += len(header)
 		header = string(bytes.TrimSpace([]byte(header)))
 
 		if len(header) == 0 || header[0] != '$' {
-			return "", []string{}, fmt.Errorf("expected bulk string, got: %s", header)
+			return "", []string{}, 0, fmt.Errorf("expected bulk string, got: %s", header)
 		}
 
 		// Parse the length
 		length, err := strconv.Atoi(header[1:])
 		if err != nil {
-			return "", []string{}, fmt.Errorf("invalid bulk string length: %s", err.Error())
+			return "", []string{}, 0, fmt.Errorf("invalid bulk string length: %s", err.Error())
 		}
 
 		// Handle Null bulk string ($ -1)
@@ -62,15 +63,16 @@ func RESPDecoder(reader *bufio.Reader) (string, []string, error) {
 		buf := make([]byte, length)
 		_, err = io.ReadFull(reader, buf)
 		if err != nil {
-			return "", []string{}, fmt.Errorf("failed to read bulk string data: %s", err.Error())
+			return "", []string{}, 0, fmt.Errorf("failed to read bulk string data: %s", err.Error())
 		}
 
 		// 4. Consume the trailing \r\n
 		trailer := make([]byte, 2)
 		_, err = io.ReadFull(reader, trailer)
 		if err != nil {
-			return "", []string{}, fmt.Errorf("failed to read trailing CRLF: %s", err.Error())
+			return "", []string{}, 0, fmt.Errorf("failed to read trailing CRLF: %s", err.Error())
 		}
+		count += length + len(trailer)
 
 		if i == 0 {
 			base = string(buf)
@@ -79,7 +81,7 @@ func RESPDecoder(reader *bufio.Reader) (string, []string, error) {
 		}
 	}
 
-	return strings.ToLower(base), args, nil
+	return strings.ToLower(base), args, count, nil
 }
 
 type EncodeType int
