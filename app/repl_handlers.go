@@ -35,3 +35,12 @@ func (com *Com) ack(srv *server.Server) ([]byte, error) {
 	res := []string{"REPLCONF", "ACK", strconv.Itoa(r.MasterOffset)}
 	return resp.RESPEncoder(res, resp.BulkList), nil
 }
+
+func (com *Com) wait(srv *server.Server) ([]byte, error) {
+	m, ok := srv.IsMaster()
+	if !ok {
+		return nil, errors.New("Not the master node")
+	}
+
+	return resp.RESPEncoder(len(m.ReplConnections), resp.Int), nil
+}

@@ -75,6 +75,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidateReplconf(args)
 	case "psync":
 		err = com.ValidatePSync(args)
+	case "wait":
+		err = com.ValidateWait(args)
 	}
 
 	return com, err
@@ -128,6 +130,8 @@ func (com *Com) HandleCom(server *server.Server, state *State) ([]byte, error) {
 		return com.replconf(server)
 	case "psync":
 		return com.psync(server)
+	case "wait":
+		return com.wait(server)
 
 	default:
 		return nil, nil
@@ -432,5 +436,21 @@ func (com *Com) ValidateReplconf(args []string) error {
 }
 
 func (com *Com) ValidatePSync(args []string) error {
+	return nil
+}
+
+func (com *Com) ValidateWait(args []string) error {
+	if len(args) >= 1 {
+		com.Args["replCount"] = []string{args[0]}
+	} else {
+		return errors.New("Wait expects repl count as a required argument")
+	}
+
+	if len(args) >= 2 {
+		com.Args["timeout"] = []string{args[1]}
+	} else {
+		return errors.New("Wait expects timeout as a required argument")
+	}
+
 	return nil
 }
