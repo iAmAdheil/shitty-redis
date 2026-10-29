@@ -59,8 +59,7 @@ func HandleClientConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 		m, ok := server.IsMaster()
 		if ok && (com.Base == "set") {
 			b := resp.RESPEncoder(append([]string{base}, args...), resp.BulkList)
-			m.IncrOffset(len(b))
-			m.Broadcast(b)
+			m.Propogate(b)
 		}
 
 		if ok && com.Base == "psync" {
@@ -75,6 +74,9 @@ func HandleClientConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 			if ok {
 				m.AddConn(conn)
 			}
+			// Done with adding conn to replconnections
+			// Now propogation can continue normally
+			m.Mu.Unlock()
 		}
 	}
 }

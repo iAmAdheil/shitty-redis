@@ -9,7 +9,7 @@ type MasterRepl struct {
 	id              string
 	replConnections []net.Conn
 	offset          int
-	mu              *sync.Mutex
+	Mu              *sync.Mutex
 }
 
 func NewMaster() *MasterRepl {
@@ -31,13 +31,33 @@ func (m *MasterRepl) Offset() int {
 	return m.offset
 }
 
-func (m *MasterRepl) IncrOffset(v int) {
-	m.mu.Lock()
+func (m *MasterRepl) incrOffset(v int) {
 	m.offset += v
-	m.mu.Unlock()
 }
 
+// handles command propogation, master -> replica
+func (m *MasterRepl) Propogate(b []byte) error {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+	m.incrOffset(len(b))
+	for _, conn := range m.replConnections {
+		_, err := conn.Write(b)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// handles simple message broadcast without a lock
+// lock handled by the caller
 func (m *MasterRepl) Broadcast(b []byte) error {
+	for _, conn := range m.replConnections {
+		_, err := conn.Write(b)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -46,7 +66,5 @@ func (m *MasterRepl) GetConnCount() int {
 }
 
 func (m *MasterRepl) AddConn(conn net.Conn) {
-	m.mu.Lock()
 	m.replConnections = append(m.replConnections, conn)
-	m.mu.Unlock()
 }

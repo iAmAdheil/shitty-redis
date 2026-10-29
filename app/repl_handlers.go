@@ -23,6 +23,10 @@ func (com *Com) psync(srv *server.Server) ([]byte, error) {
 		return nil, errors.New("Not a master node")
 	}
 
+	// start lock here, and release lock once rdb is sent
+	// prevent offset corruption for the replica -> missing propogations
+	// wait until conn is added to replconnections
+	m.Mu.Lock()
 	r := "FULLRESYNC" + " " + m.Id() + " " + strconv.Itoa(m.Offset())
 	return resp.RESPEncoder(r, resp.Simple), nil
 }
