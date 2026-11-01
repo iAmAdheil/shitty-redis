@@ -50,6 +50,12 @@ func HandleClientConn(server *server.Server, conn net.Conn, r *bufio.Reader) {
 		// 	fmt.Printf("%q\n", v)
 		// }
 
+		// for commands with no responses
+		// eg. REPLCONF ACK -> no response from master
+		if out == nil {
+			continue
+		}
+
 		if _, err := conn.Write(out); err != nil {
 			fmt.Printf("Error writing into connection: %s\n", err.Error())
 			continue
@@ -118,7 +124,7 @@ func HandleReplConn(server *server.Server, conn net.Conn, reader *bufio.Reader) 
 		}
 
 		// update offset once command execution complete -> ack
-		r.MasterOffset += bc
+		r.Offset += bc
 
 		// if update req from master, and replica -> no response
 		// runs inside go routine spawned for master-replica conn

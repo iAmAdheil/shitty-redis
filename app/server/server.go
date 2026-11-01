@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -164,7 +165,7 @@ func (srv *Server) Handshake() (net.Conn, *bufio.Reader, error) {
 		return nil, nil, err
 	}
 	// update replica -> starting offset
-	r.MasterOffset = offset
+	r.Offset = offset
 
 	// wait for rdb after psync
 	bcs, err := reader.ReadString('\n')
@@ -177,7 +178,7 @@ func (srv *Server) Handshake() (net.Conn, *bufio.Reader, error) {
 		return nil, nil, err
 	}
 	rdb := make([]byte, bc)
-	_, err = reader.Read(rdb)
+	_, err = io.ReadFull(reader, rdb)
 	if err != nil {
 		return nil, nil, err
 	}

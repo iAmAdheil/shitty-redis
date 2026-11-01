@@ -430,7 +430,13 @@ func (com *Com) ValidateInfo(args []string) error {
 
 func (com *Com) ValidateReplconf(args []string) error {
 	if len(args) >= 1 && strings.ToLower(args[0]) == "getack" {
+		com.Extras["getack"] = []string{}
+	} else if len(args) >= 1 && strings.ToLower(args[0]) == "ack" {
 		com.Extras["ack"] = []string{}
+
+		if len(args) >= 2 {
+			com.Extras["offset"] = []string{args[1]}
+		}
 	}
 	return nil
 }
@@ -441,7 +447,7 @@ func (com *Com) ValidatePSync(args []string) error {
 
 func (com *Com) ValidateWait(args []string) error {
 	if len(args) >= 1 {
-		com.Args["replCount"] = []string{args[0]}
+		com.Args["target"] = []string{args[0]}
 	} else {
 		return errors.New("Wait expects repl count as a required argument")
 	}

@@ -10,12 +10,18 @@ type MasterRepl struct {
 	replConnections []net.Conn
 	offset          int
 	Mu              *sync.Mutex
+	Ackch           chan int
+	Donech          chan any
 }
 
 func NewMaster() *MasterRepl {
 	return &MasterRepl{
-		id:     "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
-		offset: 0,
+		id:              "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
+		offset:          0,
+		replConnections: []net.Conn{},
+		Mu:              &sync.Mutex{},
+		Ackch:           nil,
+		Donech:          nil,
 	}
 }
 
@@ -49,9 +55,10 @@ func (m *MasterRepl) Propogate(b []byte) error {
 	return nil
 }
 
-// handles simple message broadcast without a lock
+// handles simple message broadcast without a lock,
 // lock handled by the caller
 func (m *MasterRepl) Broadcast(b []byte) error {
+	m.incrOffset(len(b))
 	for _, conn := range m.replConnections {
 		_, err := conn.Write(b)
 		if err != nil {
