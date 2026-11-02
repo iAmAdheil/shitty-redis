@@ -9,12 +9,17 @@ type MasterRepl struct {
 	id              string
 	replConnections []net.Conn
 	offset          int
-	Mu              *sync.Mutex
-	Ackch           chan int
-	Donech          chan any
+
+	Mu     *sync.Mutex
+	Ackch  chan int
+	Donech chan any
+
+	// rdb config -> only for master
+	Dir        string
+	DBFilename string
 }
 
-func NewMaster() *MasterRepl {
+func NewMaster(c *Config) *MasterRepl {
 	return &MasterRepl{
 		id:              "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
 		offset:          0,
@@ -22,6 +27,8 @@ func NewMaster() *MasterRepl {
 		Mu:              &sync.Mutex{},
 		Ackch:           nil,
 		Donech:          nil,
+		Dir:             c.RDBDir,
+		DBFilename:      c.RDBFilename,
 	}
 }
 

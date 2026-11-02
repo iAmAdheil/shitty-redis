@@ -77,6 +77,8 @@ func GetCom(base string, args []string) (*Com, error) {
 		err = com.ValidatePSync(args)
 	case "wait":
 		err = com.ValidateWait(args)
+	case "config":
+		err = com.ValidateGetConfig(args)
 	}
 
 	return com, err
@@ -132,6 +134,8 @@ func (com *Com) HandleCom(server *server.Server, state *State) ([]byte, error) {
 		return com.psync(server)
 	case "wait":
 		return com.wait(server)
+	case "config":
+		return com.configget(server)
 
 	default:
 		return nil, nil
@@ -456,6 +460,16 @@ func (com *Com) ValidateWait(args []string) error {
 		com.Args["timeout"] = []string{args[1]}
 	} else {
 		return errors.New("Wait expects timeout as a required argument")
+	}
+
+	return nil
+}
+
+func (com *Com) ValidateGetConfig(args []string) error {
+	if len(args) >= 2 {
+		com.Args["key"] = []string{args[1]}
+	} else {
+		return errors.New("Get Config expects a key as a required argument")
 	}
 
 	return nil

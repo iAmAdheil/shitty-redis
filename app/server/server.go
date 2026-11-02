@@ -30,7 +30,7 @@ func New(c *Config) *Server {
 
 	var repl Replication
 	if c.Role == Master {
-		repl = NewMaster()
+		repl = NewMaster(c)
 	} else if c.Role == Replica {
 		repl = NewReplica(c)
 	}

@@ -1,0 +1,5 @@
+Watch only supports SET
+
+Only SET gets propogated to other replicas
+
+More to come...

@@ -23,19 +23,25 @@ func (r Role) String() string {
 }
 
 type Config struct {
-	Port       string
-	Role       Role
-	MasterHost string
-	MasterPort string
+	Port        string
+	Role        Role
+	MasterHost  string
+	MasterPort  string
+	RDBDir      string
+	RDBFilename string
 }
 
 func ExtractConfig() *Config {
 	port := flag.String("port", "6379", "port for redis server")
 	replicaof := flag.String("replicaof", "", "server's role, as a replica or master")
+	dir := flag.String("dir", "../tmp/redis-db", "path to the directory where the RDB file is stored")
+	dbfilename := flag.String("dbfilename", "dump.rdb", "name of the RDB file")
 	flag.Parse()
 
 	cfg := &Config{
-		Port: *port,
+		Port:        *port,
+		RDBDir:      *dir,
+		RDBFilename: *dbfilename,
 	}
 
 	cfg.Role = Master

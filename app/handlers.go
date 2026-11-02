@@ -684,3 +684,21 @@ func (com *Com) info(srv *server.Server) ([]byte, error) {
 	}
 	return resp.RESPEncoder(s, resp.Bulk), nil
 }
+
+func (com *Com) configget(srv *server.Server) ([]byte, error) {
+	m, ok := srv.IsMaster()
+	if !ok {
+		return nil, errors.New("Not a master node")
+	}
+	var v string
+	key := com.Args["key"][0]
+
+	switch key {
+	case "dir":
+		v = m.Dir
+	case "dbfilename":
+		v = m.DBFilename
+	}
+
+	return resp.RESPEncoder([]string{key, v}, resp.BulkList), nil
+}
